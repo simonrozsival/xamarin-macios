@@ -759,13 +759,13 @@ namespace ObjCRuntime {
 		}
 
 #if NET
-		internal static bool HasNSObject (NativeHandle ptr)
+		public static bool HasNSObject (NativeHandle ptr)
 		{
 			return TryGetNSObject (ptr, evenInFinalizerQueue: false) is not null;
 		}
 #endif
 
-		internal static sbyte HasNSObject (IntPtr ptr)
+		public static sbyte HasNSObject (IntPtr ptr)
 		{
 			var rv = TryGetNSObject (ptr, evenInFinalizerQueue: false) is not null;
 			return (sbyte) (rv ? 1 : 0);
@@ -1324,6 +1324,15 @@ namespace ObjCRuntime {
 			if (type is null)
 				throw new ArgumentNullException (nameof (type));
 
+#if NET
+			if (Runtime.IsManagedStaticRegistrar) {
+				var instance = RegistrarHelper.ConstructNSObject<T> (ptr, type);
+				if (instance is null)
+					MissingCtor (ptr, IntPtr.Zero, type, missingCtorResolution, sel, method_handle);
+				return instance;
+			}
+#endif
+
 			var ctor = GetIntPtrConstructor (type);
 
 			if (ctor is null) {
@@ -1353,6 +1362,15 @@ namespace ObjCRuntime {
 
 			if (type.IsByRef)
 				type = type.GetElementType ()!;
+
+#if NET
+			if (Runtime.IsManagedStaticRegistrar) {
+				var instance = RegistrarHelper.ConstructINativeObject<T> (ptr, owns, type);
+				if (instance is null)
+					MissingCtor (ptr, IntPtr.Zero, type, missingCtorResolution, sel, method_handle);
+				return instance;
+			}
+#endif
 
 			var ctor = GetIntPtr_BoolConstructor (type);
 
@@ -1547,7 +1565,8 @@ namespace ObjCRuntime {
 			return GetNSObject<T> (ptr, sel, method_handle, false);
 		}
 
-		static T? GetNSObject<T> (IntPtr ptr, IntPtr sel, RuntimeMethodHandle method_handle, bool evenInFinalizerQueue) where T : NSObject
+		// TODO does this need to be public?
+		public static T? GetNSObject<T> (IntPtr ptr, IntPtr sel, RuntimeMethodHandle method_handle, bool evenInFinalizerQueue) where T : NSObject
 		{
 			if (ptr == IntPtr.Zero)
 				return null;
@@ -2326,7 +2345,7 @@ namespace ObjCRuntime {
 		}
 
 		// Allocate a GCHandle and return the IntPtr to it.
-		internal static IntPtr AllocGCHandle (object? value)
+		public static IntPtr AllocGCHandle (object? value)
 		{
 			return AllocGCHandle (value, GCHandleType.Normal);
 		}

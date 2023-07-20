@@ -31,7 +31,7 @@ namespace Foundation {
 
 #if !COREBUILD
 	// Use this for synchronous operations
-	internal abstract class NSDispatcher : NSObject {
+	public abstract partial class NSDispatcher : NSObject {
 		public const string SelectorName = "xamarinApplySelector";
 		public static readonly Selector Selector = new Selector (SelectorName);
 
@@ -47,7 +47,7 @@ namespace Foundation {
 
 	// Use this for synchronous operations
 	[Register ("__MonoMac_NSActionDispatcher")]
-	internal sealed class NSActionDispatcher : NSDispatcher {
+	public sealed class NSActionDispatcher : NSDispatcher {
 		readonly Action action;
 
 		public NSActionDispatcher (Action action)
@@ -63,7 +63,7 @@ namespace Foundation {
 
 	// Use this for synchronous operations
 	[Register ("__MonoMac_NSSynchronizationContextDispatcher")]
-	internal sealed class NSSynchronizationContextDispatcher : NSDispatcher {
+	public sealed partial class NSSynchronizationContextDispatcher : NSDispatcher {
 		readonly SendOrPostCallback d;
 		readonly object state;
 

@@ -64,12 +64,12 @@ namespace Xamarin.Linker {
 
 		void CreateRegistrarType (AssemblyTrampolineInfo info)
 		{
-			var registrarType = new TypeDefinition ("ObjCRuntime", "__Registrar__", TypeAttributes.Public | TypeAttributes.Class | TypeAttributes.Sealed | TypeAttributes.BeforeFieldInit);
-			registrarType.BaseType = abr.System_Object;
-			registrarType.Interfaces.Add (new InterfaceImplementation (abr.ObjCRuntime_IManagedRegistrar));
-			abr.CurrentAssembly.MainModule.Types.Add (registrarType);
+			// var registrarType = new TypeDefinition ("ObjCRuntime", "__Registrar__", TypeAttributes.Public | TypeAttributes.Class | TypeAttributes.Sealed | TypeAttributes.BeforeFieldInit);
+			// registrarType.BaseType = abr.System_Object;
+			// registrarType.Interfaces.Add (new InterfaceImplementation (abr.ObjCRuntime_IManagedRegistrar));
+			// abr.CurrentAssembly.MainModule.Types.Add (registrarType);
 
-			info.RegistrarType = registrarType;
+			// info.RegistrarType = registrarType;
 
 			// Remove any methods that were linked away
 			for (var i = info.Count - 1; i >= 0; i--) {
@@ -81,58 +81,59 @@ namespace Xamarin.Linker {
 			info.SetIds ();
 			var sorted = info.OrderBy (v => v.Id).ToList ();
 
-			//
-			// The callback methods themselves are all public, and thus accessible from anywhere inside
-			// the assembly even if the containing type is not public, as long as the containing type is not nested.
-			// However, if the containing type is nested inside another type, it gets complicated.
-			//
-			// We have two options:
-			// 
-			// 1. Just change the visibility on the nested type to make it visible inside the assembly.
-			// 2. Add a method in the containing type (which has access to any directly nested private types) that can look up any unmanaged trampolines.
-			//    If the containing type is also a private nested type, when we'd have to add another method in its containing type, and so on.
-			//
-			// The second option is more complicated to implement than the first, so we're doing the first option. If someone
-			// runs into any problems (there might be with reflection: looking up a type using the wrong visibility will fail to find that type).
-			// That said, there may be all sorts of problems with reflection (we're adding methods to types,
-			// any logic that depends on a type having a certain number of methods will fail for instance).
-			//
-			foreach (var md in sorted) {
-				var declType = md.Trampoline.DeclaringType;
-				while (declType.IsNested) {
-					if (declType.IsNestedPrivate) {
-						declType.IsNestedAssembly = true;
-					} else if (declType.IsNestedFamilyAndAssembly || declType.IsNestedFamily) {
-						declType.IsNestedFamilyOrAssembly = true;
-					}
-					declType = declType.DeclaringType;
-				}
-			}
+			// //
+			// // The callback methods themselves are all public, and thus accessible from anywhere inside
+			// // the assembly even if the containing type is not public, as long as the containing type is not nested.
+			// // However, if the containing type is nested inside another type, it gets complicated.
+			// //
+			// // We have two options:
+			// // 
+			// // 1. Just change the visibility on the nested type to make it visible inside the assembly.
+			// // 2. Add a method in the containing type (which has access to any directly nested private types) that can look up any unmanaged trampolines.
+			// //    If the containing type is also a private nested type, when we'd have to add another method in its containing type, and so on.
+			// //
+			// // The second option is more complicated to implement than the first, so we're doing the first option. If someone
+			// // runs into any problems (there might be with reflection: looking up a type using the wrong visibility will fail to find that type).
+			// // That said, there may be all sorts of problems with reflection (we're adding methods to types,
+			// // any logic that depends on a type having a certain number of methods will fail for instance).
+			// //
+			// foreach (var md in sorted) {
+			// 	var declType = md.Trampoline.DeclaringType;
+			// 	while (declType.IsNested) {
+			// 		if (declType.IsNestedPrivate) {
+			// 			declType.IsNestedAssembly = true;
+			// 		} else if (declType.IsNestedFamilyAndAssembly || declType.IsNestedFamily) {
+			// 			declType.IsNestedFamilyOrAssembly = true;
+			// 		}
+			// 		declType = declType.DeclaringType;
+			// 	}
+			// }
 
-			// Add default ctor that just calls the base ctor
-			var defaultCtor = registrarType.AddDefaultConstructor (abr);
+			// // Add default ctor that just calls the base ctor
+			// var defaultCtor = registrarType.AddDefaultConstructor (abr);
 
-			// Create an instance of the registrar type in the module constructor,
-			// and call ObjCRuntime.RegistrarHelper.Register with the instance.
-			AddLoadTypeToModuleConstructor (registrarType);
+			// // Create an instance of the registrar type in the module constructor,
+			// // and call ObjCRuntime.RegistrarHelper.Register with the instance.
+			// AddLoadTypeToModuleConstructor (registrarType);
 
-			// Compute the list of types that we need to register
-			var types = GetTypesToRegister (registrarType, info);
+			// // Compute the list of types that we need to register
+			// var types = GetTypesToRegister (registrarType, info);
+			var types = GetTypesToRegister (abr.CurrentAssembly.MainModule.Types.First(), info);
 
-			GenerateLookupUnmanagedFunction (registrarType, sorted);
-			GenerateLookupType (info, registrarType, types);
-			GenerateLookupTypeId (info, registrarType, types);
-			GenerateRegisterWrapperTypes (registrarType);
+			// GenerateLookupUnmanagedFunction (registrarType, sorted);
+			// GenerateLookupType (info, registrarType, types);
+			// GenerateLookupTypeId (info, registrarType, types);
+			// GenerateRegisterWrapperTypes (registrarType);
 
-			// Make sure the linker doesn't sweep away anything we just generated.
-			Annotations.Mark (registrarType);
-			foreach (var method in registrarType.Methods)
-				Annotations.Mark (method);
-			foreach (var iface in registrarType.Interfaces) {
-				Annotations.Mark (iface);
-				Annotations.Mark (iface.InterfaceType);
-				Annotations.Mark (iface.InterfaceType.Resolve ());
-			}
+			// // Make sure the linker doesn't sweep away anything we just generated.
+			// Annotations.Mark (registrarType);
+			// foreach (var method in registrarType.Methods)
+			// 	Annotations.Mark (method);
+			// foreach (var iface in registrarType.Interfaces) {
+			// 	Annotations.Mark (iface);
+			// 	Annotations.Mark (iface.InterfaceType);
+			// 	Annotations.Mark (iface.InterfaceType.Resolve ());
+			// }
 		}
 
 		void AddLoadTypeToModuleConstructor (TypeDefinition registrarType)
@@ -194,6 +195,7 @@ namespace Xamarin.Linker {
 				types.Add (new (wrapperType, wrapperType.Resolve ()));
 			}
 
+			// TODO this would have to change somehow -> some deterministic IDs?
 			// Now create a mapping from type to index
 			for (var i = 0; i < types.Count; i++)
 				info.RegisterType (types [i].Definition, (uint) i);

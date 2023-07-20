@@ -276,102 +276,105 @@ namespace Xamarin.Linker {
 		int counter;
 		void CreateUnmanagedCallersMethod (MethodDefinition method, AssemblyTrampolineInfo infos, List<TypeDefinition> proxyInterfaces)
 		{
-			var baseMethod = StaticRegistrar.GetBaseMethodInTypeHierarchy (method);
-			var placeholderType = abr.System_IntPtr;
-			var name = $"callback_{counter++}_{Sanitize (method.DeclaringType.FullName)}_{Sanitize (method.Name)}";
+			var name = $"callback_{Sanitize (method.DeclaringType.FullName)}_{Sanitize (method.Name)}";
+			infos.Add (new TrampolineInfo (method, method, name));
 
-			var callbackType = method.DeclaringType.NestedTypes.SingleOrDefault (v => v.Name == "__Registrar_Callbacks__");
-			if (callbackType is null) {
-				callbackType = new TypeDefinition (string.Empty, "__Registrar_Callbacks__", TypeAttributes.NestedPrivate | TypeAttributes.Sealed | TypeAttributes.Class);
-				callbackType.BaseType = abr.System_Object;
-				method.DeclaringType.NestedTypes.Add (callbackType);
-			}
+			// var baseMethod = StaticRegistrar.GetBaseMethodInTypeHierarchy (method);
+			// var placeholderType = abr.System_IntPtr;
+			// var name = $"callback_{counter++}_{Sanitize (method.DeclaringType.FullName)}_{Sanitize (method.Name)}";
 
-			var callback = callbackType.AddMethod (name, MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig, placeholderType);
-			callback.CustomAttributes.Add (CreateUnmanagedCallersAttribute (name));
-			infos.Add (new TrampolineInfo (callback, method, name));
+			// var callbackType = method.DeclaringType.NestedTypes.SingleOrDefault (v => v.Name == "__Registrar_Callbacks__");
+			// if (callbackType is null) {
+			// 	callbackType = new TypeDefinition (string.Empty, "__Registrar_Callbacks__", TypeAttributes.NestedPrivate | TypeAttributes.Sealed | TypeAttributes.Class);
+			// 	callbackType.BaseType = abr.System_Object;
+			// 	method.DeclaringType.NestedTypes.Add (callbackType);
+			// }
 
-			// If the target method is marked, then we must mark the trampoline as well.
-			method.CustomAttributes.Add (CreateDynamicDependencyAttribute (callbackType, callback.Name));
+			// var callback = callbackType.AddMethod (name, MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig, placeholderType);
+			// callback.CustomAttributes.Add (CreateUnmanagedCallersAttribute (name));
+			// infos.Add (new TrampolineInfo (callback, method, name));
 
-			callback.AddParameter ("pobj", abr.System_IntPtr);
+			// // If the target method is marked, then we must mark the trampoline as well.
+			// method.CustomAttributes.Add (CreateDynamicDependencyAttribute (callbackType, callback.Name));
 
-			var isGeneric = method.DeclaringType.HasGenericParameters;
-			if (isGeneric && method.IsStatic) {
-				throw ErrorHelper.CreateError (4130 /* The registrar cannot export static methods in generic classes ('{0}'). */, method.FullName);
-			} else if (isGeneric && !method.IsConstructor) {
-				// We generate a proxy interface for each generic NSObject subclass. In the static UnmanagedCallersOnly methods we don't
-				// know the generic parameters of the type we're working with and we need to use this trick to be able to call methods on the
-				// generic type without using reflection. This is an example of the code we generate in addition to user code:
-				//
-				//
-				// internal interface __IRegistrarGenericTypeProxy__CustomNSObject_1__
-				// {
-				//     void __IRegistrarGenericTypeProxy__CustomNSObject_1____SomeMethod (IntPtr p0);
-				// }
-				//
-				// public class CustomNSObject<T> : NSObject, __IRegistrarGenericTypeProxy__CustomNSObject_1__
-				//     where T : NSObject
-				// {
-				//     [Export ("someMethod:")]
-				//     public void SomeMethod (T someInput)
-				//     {
-				//         // ...
-				//     }
-				//
-				//     // generated implementation of the proxy interface:
-				//     public void __IRegistrarGenericTypeProxy__CustomNSObject_1____SomeMethod (IntPtr sel, IntPtr p0, IntPtr* exception_gchandle)
-				//     {
-				//         try {
-				//             var obj0 = Runtime.GetNSObject<T> (p0);
-				//             SomeMethod (obj0);
-				//         } catch (Exception ex) {
-				//             *exception_gchandle = Runtime.AllocGCHandle (ex);
-				//         }
-				//     }
-				//
-				//     // generated registrar callbacks:
-				//     private static class __Registrar_Callbacks__
-				//     {
-				//         [UnmanagedCallersOnly (EntryPoint = "_callback_1_CustomNSObject_1_SomeMethod")]
-				//         public unsafe static void callback_1_CustomNSObject_1_SomeMethod (IntPtr pobj, IntPtr sel, IntPtr p0, IntPtr* exception_gchandle)
-				//         {
-				//             var proxy = (__IRegistrarGenericTypeProxy__CustomNSObject_1__)Runtime.GetNSObject (pobj);
-				//             proxy.__IRegistrarGenericTypeProxy__CustomNSObject_1____SomeMethod (sel, p0, exception_gchandle);
-				//         }
-				//     }
-				// }
+			// callback.AddParameter ("pobj", abr.System_IntPtr);
 
-				var proxyInterfaceName = $"__IRegistrarGenericTypeProxy__{Sanitize (method.DeclaringType.FullName)}__";
-				TypeDefinition? proxyInterface = proxyInterfaces.SingleOrDefault (v => v.Name == proxyInterfaceName && v.Namespace == "ObjCRuntime");
-				if (proxyInterface is null) {
-					proxyInterface = new TypeDefinition ("ObjCRuntime", proxyInterfaceName, TypeAttributes.NotPublic | TypeAttributes.Interface | TypeAttributes.Abstract);
-					method.DeclaringType.Interfaces.Add (new InterfaceImplementation (proxyInterface));
-					proxyInterfaces.Add (proxyInterface);
-				}
+			// var isGeneric = method.DeclaringType.HasGenericParameters;
+			// if (isGeneric && method.IsStatic) {
+			// 	throw ErrorHelper.CreateError (4130 /* The registrar cannot export static methods in generic classes ('{0}'). */, method.FullName);
+			// } else if (isGeneric && !method.IsConstructor) {
+			// 	// We generate a proxy interface for each generic NSObject subclass. In the static UnmanagedCallersOnly methods we don't
+			// 	// know the generic parameters of the type we're working with and we need to use this trick to be able to call methods on the
+			// 	// generic type without using reflection. This is an example of the code we generate in addition to user code:
+			// 	//
+			// 	//
+			// 	// internal interface __IRegistrarGenericTypeProxy__CustomNSObject_1__
+			// 	// {
+			// 	//     void __IRegistrarGenericTypeProxy__CustomNSObject_1____SomeMethod (IntPtr p0);
+			// 	// }
+			// 	//
+			// 	// public class CustomNSObject<T> : NSObject, __IRegistrarGenericTypeProxy__CustomNSObject_1__
+			// 	//     where T : NSObject
+			// 	// {
+			// 	//     [Export ("someMethod:")]
+			// 	//     public void SomeMethod (T someInput)
+			// 	//     {
+			// 	//         // ...
+			// 	//     }
+			// 	//
+			// 	//     // generated implementation of the proxy interface:
+			// 	//     public void __IRegistrarGenericTypeProxy__CustomNSObject_1____SomeMethod (IntPtr sel, IntPtr p0, IntPtr* exception_gchandle)
+			// 	//     {
+			// 	//         try {
+			// 	//             var obj0 = Runtime.GetNSObject<T> (p0);
+			// 	//             SomeMethod (obj0);
+			// 	//         } catch (Exception ex) {
+			// 	//             *exception_gchandle = Runtime.AllocGCHandle (ex);
+			// 	//         }
+			// 	//     }
+			// 	//
+			// 	//     // generated registrar callbacks:
+			// 	//     private static class __Registrar_Callbacks__
+			// 	//     {
+			// 	//         [UnmanagedCallersOnly (EntryPoint = "_callback_1_CustomNSObject_1_SomeMethod")]
+			// 	//         public unsafe static void callback_1_CustomNSObject_1_SomeMethod (IntPtr pobj, IntPtr sel, IntPtr p0, IntPtr* exception_gchandle)
+			// 	//         {
+			// 	//             var proxy = (__IRegistrarGenericTypeProxy__CustomNSObject_1__)Runtime.GetNSObject (pobj);
+			// 	//             proxy.__IRegistrarGenericTypeProxy__CustomNSObject_1____SomeMethod (sel, p0, exception_gchandle);
+			// 	//         }
+			// 	//     }
+			// 	// }
 
-				var methodName = $"{proxyInterfaceName}_{method.Name}";
-				var interfaceMethod = proxyInterface.AddMethod (methodName, MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.NewSlot | MethodAttributes.Abstract | MethodAttributes.Virtual, placeholderType);
-				var implementationMethod = method.DeclaringType.AddMethod (methodName, MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.Virtual | MethodAttributes.NewSlot | MethodAttributes.Final, placeholderType);
+			// 	var proxyInterfaceName = $"__IRegistrarGenericTypeProxy__{Sanitize (method.DeclaringType.FullName)}__";
+			// 	TypeDefinition? proxyInterface = proxyInterfaces.SingleOrDefault (v => v.Name == proxyInterfaceName && v.Namespace == "ObjCRuntime");
+			// 	if (proxyInterface is null) {
+			// 		proxyInterface = new TypeDefinition ("ObjCRuntime", proxyInterfaceName, TypeAttributes.NotPublic | TypeAttributes.Interface | TypeAttributes.Abstract);
+			// 		method.DeclaringType.Interfaces.Add (new InterfaceImplementation (proxyInterface));
+			// 		proxyInterfaces.Add (proxyInterface);
+			// 	}
 
-				// the callback will only call the proxy method and the proxy method will perform all the conversions
-				EmitCallToExportedMethod (method, implementationMethod);
+			// 	var methodName = $"{proxyInterfaceName}_{method.Name}";
+			// 	var interfaceMethod = proxyInterface.AddMethod (methodName, MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.NewSlot | MethodAttributes.Abstract | MethodAttributes.Virtual, placeholderType);
+			// 	var implementationMethod = method.DeclaringType.AddMethod (methodName, MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.Virtual | MethodAttributes.NewSlot | MethodAttributes.Final, placeholderType);
 
-				// now copy the return type and params (incl. sel and exception_gchandle) to the UCO itself
-				// and also to the proxy interface 
-				callback.ReturnType = implementationMethod.ReturnType;
-				interfaceMethod.ReturnType = implementationMethod.ReturnType;
+			// 	// the callback will only call the proxy method and the proxy method will perform all the conversions
+			// 	EmitCallToExportedMethod (method, implementationMethod);
 
-				foreach (var parameter in implementationMethod.Parameters) {
-					callback.AddParameter (parameter.Name, parameter.ParameterType);
-					interfaceMethod.AddParameter (parameter.Name, parameter.ParameterType);
-				}
+			// 	// now copy the return type and params (incl. sel and exception_gchandle) to the UCO itself
+			// 	// and also to the proxy interface 
+			// 	callback.ReturnType = implementationMethod.ReturnType;
+			// 	interfaceMethod.ReturnType = implementationMethod.ReturnType;
 
-				// we need to wait until we know all the parameters of the interface method before we generate this method
-				EmitCallToProxyMethod (method, callback, interfaceMethod);
-			} else {
-				EmitCallToExportedMethod (method, callback);
-			}
+			// 	foreach (var parameter in implementationMethod.Parameters) {
+			// 		callback.AddParameter (parameter.Name, parameter.ParameterType);
+			// 		interfaceMethod.AddParameter (parameter.Name, parameter.ParameterType);
+			// 	}
+
+			// 	// we need to wait until we know all the parameters of the interface method before we generate this method
+			// 	EmitCallToProxyMethod (method, callback, interfaceMethod);
+			// } else {
+			// 	EmitCallToExportedMethod (method, callback);
+			// }
 		}
 
 		public void EmitCallToProxyMethod (MethodDefinition method, MethodDefinition callback, MethodDefinition proxyInterfaceMethod)

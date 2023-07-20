@@ -603,6 +603,7 @@
 			<_TrimmerCustomSteps Include="$(_AdditionalTaskAssembly)" BeforeStep="MarkStep" Type="MonoTouch.Tuner.RegistrarRemovalTrackingStep" />
 			<!-- TODO: these steps should probably run after mark. -->
 			<_TrimmerCustomSteps Include="$(_AdditionalTaskAssembly)" BeforeStep="MarkStep" Condition="'$(_AreAnyAssembliesTrimmed)' == 'true'" Type="Xamarin.Linker.Steps.PreMarkDispatcher" />
+			<!-- TODO: do I have to let it run but prevent it from generating the UCOs? -->
 			<_TrimmerCustomSteps Include="$(_AdditionalTaskAssembly)" BeforeStep="MarkStep" Type="Xamarin.Linker.ManagedRegistrarStep" Condition="'$(Registrar)' == 'managed-static'" />
 
 			<!--

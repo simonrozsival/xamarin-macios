@@ -335,7 +335,7 @@ namespace Xamarin.Linker {
 
 		public TypeReference ObjCRuntime_IManagedRegistrar {
 			get {
-				return GetTypeReference (PlatformAssembly, "ObjCRuntime.IManagedRegistrar", out var _);
+				return GetTypeReference (PlatformAssembly, "ObjCRuntime.ManagedRegistrar", out var _);
 			}
 		}
 

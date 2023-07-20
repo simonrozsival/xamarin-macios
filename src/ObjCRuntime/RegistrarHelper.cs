@@ -36,12 +36,12 @@ using Xamarin.Bundler;
 namespace ObjCRuntime {
 	// This class contains helper methods for the managed static registrar.
 	// The managed static registrar will make it public when needed.
-	static class RegistrarHelper {
+	public static class RegistrarHelper {
 		class MapInfo {
-			public IManagedRegistrar Registrar;
-			public bool RegisteredWrapperTypes;
+			public ManagedRegistrar Registrar;
+			public HashSet<RuntimeTypeHandle> RegisteredWrapperTypes = new();
 
-			public MapInfo (IManagedRegistrar registrar)
+			public MapInfo (ManagedRegistrar registrar)
 			{
 				Registrar = registrar;
 			}
@@ -114,7 +114,7 @@ namespace ObjCRuntime {
 			}
 		}
 
-		static void Register (IManagedRegistrar registrar)
+		public static void Register (ManagedRegistrar registrar)
 		{
 			var assembly = registrar.GetType ().Assembly;
 			var assemblyName = assembly.GetName ().Name!;
@@ -138,11 +138,11 @@ namespace ObjCRuntime {
 					return Type.GetTypeFromHandle (wrapperType);
 
 				// Not in our dictionary, get the map entry to see if we've already
-				// called RegisterWrapperTypes for this assembly,
+				// called RegisterWrapperType for this assembly,
 				var entry = GetMapEntry (type.Assembly);
-				if (!entry.RegisteredWrapperTypes) {
-					entry.Registrar.RegisterWrapperTypes (wrapper_types);
-					entry.RegisteredWrapperTypes = true;
+				if (!entry.RegisteredWrapperTypes.Contains (typeHandle)) {
+					entry.Registrar.RegisterWrapperType (typeHandle, wrapper_types);
+					entry.RegisteredWrapperTypes.Add (typeHandle);
 				}
 
 				// Return whatever's in the dictionary now.
@@ -206,6 +206,22 @@ namespace ObjCRuntime {
 			if (!TryGetMapEntry (type.Assembly.GetName ().Name!, out var entry))
 				return Runtime.INVALID_TOKEN_REF;
 			return entry.Registrar.LookupTypeId (type.TypeHandle);
+		}
+
+		internal static T? ConstructNSObject<T> (IntPtr ptr, Type type)
+			where T : class, INativeObject
+		{
+			if (!TryGetMapEntry (type.Assembly.GetName ().Name!, out var entry))
+				return null;
+			return (T?)(INativeObject?)entry.Registrar.CreateNSObject (type.TypeHandle, ptr);
+		}
+
+		internal static T? ConstructINativeObject<T> (IntPtr ptr, bool owns, Type type)
+			where T : class, INativeObject
+		{
+			if (!TryGetMapEntry (type.Assembly.GetName ().Name!, out var entry))
+				return null;
+			return (T?)entry.Registrar.CreateINativeObject (type.TypeHandle, ptr, owns);
 		}
 
 		// helper functions for converting between native and managed objects

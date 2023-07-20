@@ -220,6 +220,15 @@ namespace Foundation {
 			InitializeObject (alloced);
 		}
 
+		// TODO do something more clever here (get rid of _x)
+		protected NSObject (NativeHandle handle, int _x)
+		{
+			this.handle = handle;
+			this.flags = Flags.NativeRef;
+			bool alloced = AllocIfNeeded ();
+			InitializeObject (alloced);
+		}
+
 		~NSObject ()
 		{
 			Dispose (false);
@@ -974,7 +983,7 @@ namespace Foundation {
 
 		[Register ("__NSObject_Disposer")]
 		[Preserve (AllMembers = true)]
-		internal class NSObject_Disposer : NSObject {
+		public partial class NSObject_Disposer : NSObject {
 			static readonly List<NSObject> drainList1 = new List<NSObject> ();
 			static readonly List<NSObject> drainList2 = new List<NSObject> ();
 			static List<NSObject> handles = drainList1;
@@ -1019,7 +1028,7 @@ namespace Foundation {
 			static bool draining;
 
 			[Export ("drain:")]
-			static void Drain (NSObject ctx)
+			public static void Drain (NSObject ctx)
 			{
 				List<NSObject> drainList;
 
