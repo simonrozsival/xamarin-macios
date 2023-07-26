@@ -10,50 +10,24 @@ using Foundation;
 using ObjCRuntime;
 using UIKit;
 
-internal static class ManagedRegistrarSingleton
-{
-	private static ManagedRegistrar s_instance = new();
-
-	[ModuleInitializer]
-	public static void Init()
-	{
-		RegistrarHelper.Register(s_instance);
-	}
-
-	public static void RegisterType<T>() where T : IManagedRegistrarType
-		=> s_instance.RegisterType<T>();
-
-	public static NSObject? CreateNSObject(RuntimeTypeHandle runtimeTypeHandle, NativeHandle handle)
-		=> s_instance.CreateNSObject(runtimeTypeHandle, handle);
-
-	public static INativeObject? CreateINativeObject(RuntimeTypeHandle runtimeTypeHandle, NativeHandle handle, bool owns)
-		=> s_instance.CreateINativeObject(runtimeTypeHandle, handle, owns);
-
-	public static RuntimeTypeHandle LookupType(uint id) => s_instance.LookupType(id);
-	public static uint LookupTypeId(RuntimeTypeHandle handle) => s_instance.LookupTypeId(handle);
-
-	public static bool RegisterWrapperType(RuntimeTypeHandle runtimeTypeHandle, Dictionary<RuntimeTypeHandle, RuntimeTypeHandle> wrapperTypes)
-		=> s_instance.RegisterWrapperType(runtimeTypeHandle, wrapperTypes);
-}
-
 namespace MySingleView
 {
 	partial class AppDelegate : ObjCRuntime.IManagedRegistrarType
 	{
-		static AppDelegate()
-		{
-			// TOOD what's supposed to be the id?
-			ManagedRegistrarSingleton.RegisterType<AppDelegate>();
-		}
+		// Important: If the type has its own static ctor, the `RegisterType` method must be called manually.
+		static AppDelegate() => ManagedRegistrar.Register<AppDelegate>();
+		public static new NSObject CreateNSObject(NativeHandle handle) => new AppDelegate(handle);
+		public static new uint TypeId => 0u;
 
 		// used instead of the [Export("init")] ctor from NSObject in an UCO
 		// the base ctor doesn't take the native handle as a param, now we force it to do so...
-		internal AppDelegate(ObjCRuntime.ManagedRegistrarHandleWrapper handle)
-			: base(handle)
+		internal AppDelegate(ObjCRuntime.ManagedRegistrarHandleWrapper handle) : base((NativeHandle)handle)
 		{
 		}
 
-		public static new uint TypeId => 0;
+		protected internal AppDelegate (NativeHandle handle) : base (handle)
+		{
+		}
 	}
 }
 
@@ -64,7 +38,8 @@ namespace ObjCRuntime
 		[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_AppDelegate_FinishedLaunching")]
 		public unsafe static byte callback_MySingleView_AppDelegate_FinishedLaunching(IntPtr pobj, IntPtr sel, IntPtr p0, IntPtr p1, IntPtr* exception_gchandle)
 		{
-			var methodHandle = typeof(MySingleView.AppDelegate).GetMethod(nameof(MySingleView.AppDelegate.FinishedLaunching))!.MethodHandle; // ?? how to do thsi without reflection?
+			// var methodHandle = typeof(MySingleView.AppDelegate).GetMethod(nameof(MySingleView.AppDelegate.FinishedLaunching))!.MethodHandle; // ?? how to do thsi without reflection?
+			RuntimeMethodHandle methodHandle = default;
 			try
 			{
 				MySingleView.AppDelegate nSObject = Runtime.GetNSObject<MySingleView.AppDelegate>(pobj, sel, methodHandle, true)!;
@@ -102,12 +77,14 @@ namespace ObjCRuntime
 		}
 	}
 
+#if __MACCATALYST__
 	internal sealed class AppKit_ActionDispatcher__Registrar_Callbacks__
 	{
 		[UnmanagedCallersOnly(EntryPoint = "_callback_AppKit_ActionDispatcher_OnActivated")]
 		public unsafe static void callback_AppKit_ActionDispatcher_OnActivated(IntPtr pobj, IntPtr sel, IntPtr p0, IntPtr* exception_gchandle)
 		{
-			var methodHandle = typeof(AppKit.ActionDispatcher).GetMethod("OnActivated")!.MethodHandle;
+			// var methodHandle = typeof(AppKit.ActionDispatcher).GetMethod("OnActivated")!.MethodHandle;
+			RuntimeMethodHandle methodHandle = default;
 			try
 			{
 				AppKit.ActionDispatcher nSObject = Runtime.GetNSObject<AppKit.ActionDispatcher>(pobj, sel, methodHandle, true)!;
@@ -123,7 +100,8 @@ namespace ObjCRuntime
 		[UnmanagedCallersOnly(EntryPoint = "_callback_AppKit_ActionDispatcher_OnActivated2")]
 		public unsafe static void callback_AppKit_ActionDispatcher_OnActivated2(IntPtr pobj, IntPtr sel, IntPtr p0, IntPtr* exception_gchandle)
 		{
-			var methodHandle = typeof(AppKit.ActionDispatcher).GetMethod("OnActivated2")!.MethodHandle;
+			// var methodHandle = typeof(AppKit.ActionDispatcher).GetMethod("OnActivated2")!.MethodHandle;
+			RuntimeMethodHandle methodHandle = default;
 			try
 			{
 				AppKit.ActionDispatcher nSObject = Runtime.GetNSObject<AppKit.ActionDispatcher>(pobj, sel, methodHandle, true)!;
@@ -139,7 +117,8 @@ namespace ObjCRuntime
 		[UnmanagedCallersOnly(EntryPoint = "_callback_AppKit_ActionDispatcher_get_WorksWhenModal")]
 		public unsafe static byte callback_AppKit_ActionDispatcher_get_WorksWhenModal(IntPtr pobj, IntPtr sel, IntPtr* exception_gchandle)
 		{
-			var methodHandle = typeof(AppKit.ActionDispatcher).GetProperty("WorksWhenModal")!.GetMethod!.MethodHandle;
+			// var methodHandle = typeof(AppKit.ActionDispatcher).GetProperty("WorksWhenModal")!.GetMethod!.MethodHandle;
+			RuntimeMethodHandle methodHandle = default;
 			try
 			{
 				AppKit.ActionDispatcher nSObject = Runtime.GetNSObject<AppKit.ActionDispatcher>(pobj, sel, methodHandle, true)!;
@@ -152,6 +131,7 @@ namespace ObjCRuntime
 			return default(byte);
 		}
 	}
+#endif
 
 	internal sealed class UIKit_UIApplicationDelegate__Registrar_Callbacks__
 	{
@@ -178,6 +158,25 @@ namespace ObjCRuntime
 		}
 	}
 
+	internal sealed class UIKit_UIControlEventProxy__Registrar_Callbacks__
+	{
+		[UnmanagedCallersOnly(EntryPoint = "_callback_UIKit_UIControlEventProxy_Activated")]
+		public unsafe static void callback_UIKit_UIControlEventProxy_Activated(IntPtr pobj, IntPtr sel, IntPtr* exception_gchandle)
+		{
+			RuntimeMethodHandle methodHandle = default;
+			try
+			{
+				// TODO maybe we should pass the method name instead of the methodHandle?
+				UIKit.UIControlEventProxy nSObject = Runtime.GetNSObject<UIKit.UIControlEventProxy>(pobj, sel, methodHandle, true)!;
+				nSObject.Activated();
+			}
+			catch (Exception ex)
+			{
+				*exception_gchandle = Runtime.AllocGCHandle(ex);
+			}
+		}
+	}
+
 	internal sealed class Foundation_NSDispatcher__Registrar_Callbacks__
 	{
 		// !!!! NSDispatcher is abstract
@@ -194,7 +193,7 @@ namespace ObjCRuntime
 				// Foundation.NSDispatcher nSDispatcher = NSObject.AllocateNSObject<Foundation.NSDispatcher>(pobj);
 				// nSDispatcher..ctor();
 				throw new InvalidOperationException($"Cannot create an instance of an abstract class {nameof(Foundation.NSDispatcher)}");
-			}
+			} 
 			catch (Exception ex)
 			{
 				*exception_gchandle = Runtime.AllocGCHandle(ex);
@@ -205,11 +204,96 @@ namespace ObjCRuntime
 		[UnmanagedCallersOnly(EntryPoint = "_callback_Foundation_NSDispatcher_Apply")]
 		public unsafe static void callback_Foundation_NSDispatcher_Apply(IntPtr pobj, IntPtr sel, IntPtr* exception_gchandle)
 		{
-			var methodHandle = typeof(Foundation.NSDispatcher).GetMethod("Apply")!.MethodHandle;
+			// var methodHandle = typeof(Foundation.NSDispatcher).GetMethod("Apply")!.MethodHandle;
+			RuntimeMethodHandle methodHandle = default;
 			try
 			{
 				// TODO maybe we should pass the method name instead of the methodHandle?
 				Foundation.NSDispatcher nSObject = Runtime.GetNSObject<Foundation.NSDispatcher>(pobj, sel, methodHandle, true)!;
+				nSObject.Apply();
+			}
+			catch (Exception ex)
+			{
+				*exception_gchandle = Runtime.AllocGCHandle(ex);
+			}
+		}
+	}
+
+	internal sealed class Foundation_NSAsyncDispatcher__Registrar_Callbacks__
+	{
+		// !!!! NSAsyncDispatcher is abstract
+		[UnmanagedCallersOnly(EntryPoint = "_callback_Foundation_NSAsyncDispatcher__ctor")]
+		public unsafe static NativeHandle callback_Foundation_NSAsyncDispatcher__ctor(IntPtr pobj, IntPtr sel, byte* call_super, IntPtr* exception_gchandle)
+		{
+			try
+			{
+				if (Runtime.HasNSObject(pobj) != 0)
+				{
+					*call_super = 1;
+					return pobj;
+				}
+				// Foundation.NSAsyncDispatcher nSDispatcher = NSObject.AllocateNSObject<Foundation.NSAsyncDispatcher>(pobj);
+				// nSDispatcher..ctor();
+				throw new InvalidOperationException($"Cannot create an instance of an abstract class {nameof(Foundation.NSDispatcher)}");
+			}
+			catch (Exception ex)
+			{
+				*exception_gchandle = Runtime.AllocGCHandle(ex);
+			}
+			return default(NativeHandle);
+		}
+
+		[UnmanagedCallersOnly(EntryPoint = "_callback_Foundation_NSAsyncDispatcher_Apply")]
+		public unsafe static void callback_Foundation_NSAsyncDispatcher_Apply(IntPtr pobj, IntPtr sel, IntPtr* exception_gchandle)
+		{
+			// var methodHandle = typeof(Foundation.NSAsyncDispatcher).GetMethod("Apply")!.MethodHandle;
+			RuntimeMethodHandle methodHandle = default;
+			try
+			{
+				// TODO maybe we should pass the method name instead of the methodHandle?
+				Foundation.NSAsyncDispatcher nSObject = Runtime.GetNSObject<Foundation.NSAsyncDispatcher>(pobj, sel, methodHandle, true)!;
+				nSObject.Apply();
+			}
+			catch (Exception ex)
+			{
+				*exception_gchandle = Runtime.AllocGCHandle(ex);
+			}
+		}
+	}
+
+	internal sealed class Foundation_NSAsyncSynchronizationContextDispatcher__Registrar_Callbacks__
+	{
+		// !!!! NSAsyncSynchronizationContextDispatcher is abstract
+		[UnmanagedCallersOnly(EntryPoint = "_callback_Foundation_NSAsyncSynchronizationContextDispatcher__ctor")]
+		public unsafe static NativeHandle callback_Foundation_NSAsyncSynchronizationContextDispatcher__ctor(IntPtr pobj, IntPtr sel, byte* call_super, IntPtr* exception_gchandle)
+		{
+			try
+			{
+				if (Runtime.HasNSObject(pobj) != 0)
+				{
+					*call_super = 1;
+					return pobj;
+				}
+				// Foundation.NSAsyncSynchronizationContextDispatcher nSDispatcher = NSObject.AllocateNSObject<Foundation.NSAsyncSynchronizationContextDispatcher>(pobj);
+				// nSDispatcher..ctor();
+				throw new InvalidOperationException($"Cannot create an instance of an abstract class {nameof(Foundation.NSDispatcher)}");
+			}
+			catch (Exception ex)
+			{
+				*exception_gchandle = Runtime.AllocGCHandle(ex);
+			}
+			return default(NativeHandle);
+		}
+
+		[UnmanagedCallersOnly(EntryPoint = "_callback_Foundation_NSAsyncSynchronizationContextDispatcher_Apply")]
+		public unsafe static void callback_Foundation_NSAsyncSynchronizationContextDispatcher_Apply(IntPtr pobj, IntPtr sel, IntPtr* exception_gchandle)
+		{
+			// var methodHandle = typeof(Foundation.NSAsyncSynchronizationContextDispatcher).GetMethod("Apply")!.MethodHandle;
+			RuntimeMethodHandle methodHandle = default;
+			try
+			{
+				// TODO maybe we should pass the method name instead of the methodHandle?
+				Foundation.NSAsyncSynchronizationContextDispatcher nSObject = Runtime.GetNSObject<Foundation.NSAsyncSynchronizationContextDispatcher>(pobj, sel, methodHandle, true)!;
 				nSObject.Apply();
 			}
 			catch (Exception ex)
@@ -224,7 +308,8 @@ namespace ObjCRuntime
 		[UnmanagedCallersOnly(EntryPoint = "_callback_Foundation_NSSynchronizationContextDispatcher_Apply")]
 		public unsafe static void callback_Foundation_NSSynchronizationContextDispatcher_Apply(IntPtr pobj, IntPtr sel, IntPtr* exception_gchandle)
 		{
-			var methodHandle = typeof(Foundation.NSSynchronizationContextDispatcher).GetMethod("Apply")!.MethodHandle;
+			// var methodHandle = typeof(Foundation.NSSynchronizationContextDispatcher).GetMethod("Apply")!.MethodHandle;
+			RuntimeMethodHandle methodHandle = default;
 			try
 			{
 				Foundation.NSSynchronizationContextDispatcher nSObject = Runtime.GetNSObject<Foundation.NSSynchronizationContextDispatcher>(pobj, sel, methodHandle, true)!;
@@ -263,7 +348,8 @@ namespace ObjCRuntime
 		[UnmanagedCallersOnly(EntryPoint = "_callback_Foundation_NSObject_NSObject_Disposer_Drain")]
 		public unsafe static void callback_Foundation_NSObject_NSObject_Disposer_Drain(IntPtr pobj, IntPtr sel, IntPtr p0, IntPtr* exception_gchandle)
 		{
-			var methodHandle = typeof(Foundation.NSObject.NSObject_Disposer).GetMethod("Drain")!.MethodHandle;
+			// var methodHandle = typeof(Foundation.NSObject.NSObject_Disposer).GetMethod("Drain")!.MethodHandle;
+			RuntimeMethodHandle methodHandle = default;
 			try
 			{
 				NSObject nSObject = Runtime.GetNSObject<NSObject>(p0, sel, methodHandle, false)!;

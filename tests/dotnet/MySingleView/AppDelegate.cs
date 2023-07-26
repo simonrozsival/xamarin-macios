@@ -13,7 +13,12 @@ namespace MySingleView {
 
 			var dvc = new UIViewController ();
 			var button = new UIButton (window.Bounds);
-			button.SetTitle ("net6!", UIControlState.Normal);
+			button.SetTitle ("\"Source-generated\" Managed Static Registrar", UIControlState.Normal);
+			var clicked = 0;
+			button.TouchUpInside += (sender, e) => {
+				var pluralSuffix = clicked > 1 ? "s" : "";
+				button.SetTitle ($"Clicked {++clicked} time{pluralSuffix}.", UIControlState.Normal);
+			};
 			dvc.Add (button);
 
 			window.RootViewController = dvc;

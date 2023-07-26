@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
-		<TargetFramework>net$(BundledNETCoreAppTargetFrameworkVersion)-maccatalyst</TargetFramework>
+		<TargetFrameworks>net$(BundledNETCoreAppTargetFrameworkVersion)-maccatalyst;net$(BundledNETCoreAppTargetFrameworkVersion)-ios</TargetFrameworks>
 		<OutputType>Exe</OutputType>
 
 		<ApplicationTitle>MySingleTitle</ApplicationTitle>

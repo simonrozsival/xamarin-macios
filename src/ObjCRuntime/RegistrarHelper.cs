@@ -8,7 +8,6 @@
 
 
 // #define TRACE
-
 #if NET
 
 #nullable enable
@@ -24,6 +23,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 
 using CoreFoundation;
 using CoreGraphics;
@@ -37,13 +37,14 @@ namespace ObjCRuntime {
 	// This class contains helper methods for the managed static registrar.
 	// The managed static registrar will make it public when needed.
 	public static class RegistrarHelper {
-		class MapInfo {
-			public ManagedRegistrar Registrar;
-			public HashSet<RuntimeTypeHandle> RegisteredWrapperTypes = new();
+		private class MapInfo {
+			internal ManagedRegistrar Registrar;
+			internal HashSet<RuntimeTypeHandle> RegisteredWrapperTypes;
 
-			public MapInfo (ManagedRegistrar registrar)
+			internal MapInfo (RuntimeTypeHandleEqualityComparer comparer)
 			{
-				Registrar = registrar;
+				Registrar = new (comparer);
+				RegisteredWrapperTypes = new (comparer);
 			}
 		}
 
@@ -58,13 +59,12 @@ namespace ObjCRuntime {
 		static RuntimeTypeHandleEqualityComparer RuntimeTypeHandleEqualityComparer;
 #pragma warning restore 8618
 
-		[ModuleInitializer]
-		internal static void Initialize ()
+		static RegistrarHelper ()
 		{
-			StringEqualityComparer = new StringEqualityComparer ();
-			RuntimeTypeHandleEqualityComparer = new RuntimeTypeHandleEqualityComparer ();
-			assembly_map = new Dictionary<string, MapInfo> (StringEqualityComparer);
-			wrapper_types = new Dictionary<RuntimeTypeHandle, RuntimeTypeHandle> (RuntimeTypeHandleEqualityComparer);
+			StringEqualityComparer = new ();
+			RuntimeTypeHandleEqualityComparer = new ();
+			assembly_map = new (StringEqualityComparer);
+			wrapper_types = new (RuntimeTypeHandleEqualityComparer);
 		}
 
 		static NativeHandle CreateCFArray (params string[]? values)
@@ -87,70 +87,34 @@ namespace ObjCRuntime {
 			return BlockLiteral.GetBlockForDelegate (method, @delegate, Runtime.INVALID_TOKEN_REF, null);
 		}
 
-
-		static MapInfo GetMapEntry (Assembly assembly)
-		{
-			return GetMapEntry (assembly.GetName ().Name!);
-		}
-
-		static MapInfo GetMapEntry (IntPtr assembly)
-		{
-			return GetMapEntry (Marshal.PtrToStringAuto (assembly)!);
-		}
-
-		static MapInfo GetMapEntry (string assemblyName)
-		{
-			if (TryGetMapEntry (assemblyName, out var rv))
-				return rv;
-			throw ErrorHelper.CreateError (8055, Errors.MX8055 /* Could not find the type 'ObjCRuntime.__Registrar__' in the assembly '{0}' */, assemblyName);
-		}
-
-		static bool TryGetMapEntry (string assemblyName, [NotNullWhen (true)] out MapInfo? entry)
-		{
-			entry = null;
-
-			lock (assembly_map) {
-				return assembly_map.TryGetValue (assemblyName, out entry);
-			}
-		}
-
-		public static void Register (ManagedRegistrar registrar)
-		{
-			var assembly = registrar.GetType ().Assembly;
-			var assemblyName = assembly.GetName ().Name!;
-
-#if TRACE
-			Runtime.NSLog ($"RegistrarHelper.Register ('{assemblyName}', '{registrar.GetType ().AssemblyQualifiedName}')");
-#endif
-
-			lock (assembly_map) {
-				assembly_map.Add (assemblyName, new MapInfo (registrar));
-			}
-		}
-
 		internal static Type? FindProtocolWrapperType (Type type)
 		{
 			var typeHandle = type.TypeHandle;
 
-			lock (assembly_map) {
-				// First check if the type is already in our dictionary.
-				if (wrapper_types.TryGetValue (typeHandle, out var wrapperType))
-					return Type.GetTypeFromHandle (wrapperType);
+			// First check if the type is already in our dictionary.
+			if (wrapper_types.TryGetValue (typeHandle, out var wrapperType))
+				return Type.GetTypeFromHandle (wrapperType);
 
-				// Not in our dictionary, get the map entry to see if we've already
-				// called RegisterWrapperType for this assembly,
-				var entry = GetMapEntry (type.Assembly);
-				if (!entry.RegisteredWrapperTypes.Contains (typeHandle)) {
-					entry.Registrar.RegisterWrapperType (typeHandle, wrapper_types);
-					entry.RegisteredWrapperTypes.Add (typeHandle);
-				}
-
-				// Return whatever's in the dictionary now.
-				if (wrapper_types.TryGetValue (typeHandle, out wrapperType))
-					return Type.GetTypeFromHandle (wrapperType);
+			// Not in our dictionary, get the map entry to see if we've already
+			// called RegisterWrapperType for this assembly,
+			var map = GetOrInitMapInfo (type.Assembly);
+			if (!map.RegisteredWrapperTypes.Contains (typeHandle)) {
+				map.Registrar.RegisterWrapperType (typeHandle, wrapper_types);
+				map.RegisteredWrapperTypes.Add (typeHandle);
 			}
 
+			// Return whatever's in the dictionary now.
+			if (wrapper_types.TryGetValue (typeHandle, out wrapperType))
+				return Type.GetTypeFromHandle (wrapperType);
+
 			return null;
+		}
+
+		internal static void RegisterManagedRegistrarType<T> ()
+			where T : IManagedRegistrarType
+		{
+			var map = GetOrInitMapInfo (typeof (T).Assembly);
+			map.Registrar.AddType<T> ();
 		}
 
 #if TRACE
@@ -190,38 +154,46 @@ namespace ObjCRuntime {
 
 		static IntPtr LookupUnmanagedFunctionInAssembly (IntPtr assembly_name, string? symbol, int id)
 		{
-			var entry = GetMapEntry (assembly_name);
-			return entry.Registrar.LookupUnmanagedFunction (symbol, id);
+			// return registrar.LookupUnmanagedFunction (symbol, id);
+			return IntPtr.Zero;
 		}
 
 		internal static Type LookupRegisteredType (Assembly assembly, uint id)
 		{
-			var entry = GetMapEntry (assembly);
-			var handle = entry.Registrar.LookupType (id);
+			var map = GetOrInitMapInfo (assembly);
+			var handle = map.Registrar.LookupType (id);
 			return Type.GetTypeFromHandle (handle)!;
 		}
 
 		internal static uint LookupRegisteredTypeId (Type type)
 		{
-			if (!TryGetMapEntry (type.Assembly.GetName ().Name!, out var entry))
-				return Runtime.INVALID_TOKEN_REF;
-			return entry.Registrar.LookupTypeId (type.TypeHandle);
+			var map = GetOrInitMapInfo (type.Assembly);
+			return map.Registrar.LookupTypeId (type.TypeHandle);
 		}
 
 		internal static T? ConstructNSObject<T> (IntPtr ptr, Type type)
 			where T : class, INativeObject
 		{
-			if (!TryGetMapEntry (type.Assembly.GetName ().Name!, out var entry))
-				return null;
-			return (T?)(INativeObject?)entry.Registrar.CreateNSObject (type.TypeHandle, ptr);
+			var map = GetOrInitMapInfo (type.Assembly);
+			return (T?)(INativeObject?)map.Registrar.CreateNSObject (type.TypeHandle, ptr);
 		}
 
 		internal static T? ConstructINativeObject<T> (IntPtr ptr, bool owns, Type type)
 			where T : class, INativeObject
 		{
-			if (!TryGetMapEntry (type.Assembly.GetName ().Name!, out var entry))
-				return null;
-			return (T?)entry.Registrar.CreateINativeObject (type.TypeHandle, ptr, owns);
+			var map = GetOrInitMapInfo (type.Assembly);
+			return (T?)map.Registrar.CreateINativeObject (type.TypeHandle, ptr, owns);
+		}
+		
+		static MapInfo GetOrInitMapInfo (Assembly assembly)
+		{
+			var assemblyName = assembly.FullName!;
+			if (!assembly_map.TryGetValue (assemblyName, out var map))
+			{
+				map = assembly_map [assemblyName] = new MapInfo (RuntimeTypeHandleEqualityComparer);
+			}
+
+			return map;
 		}
 
 		// helper functions for converting between native and managed objects

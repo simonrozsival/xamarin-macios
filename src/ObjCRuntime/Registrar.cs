@@ -1550,6 +1550,8 @@ namespace Registrar {
 		// This method is thread-safe (locks 'types').
 		public ObjCType RegisterType (TType type)
 		{
+			Console.WriteLine($"RegisterType({type})");
+			
 			ObjCType rv;
 			List<Exception> exceptions = null;
 

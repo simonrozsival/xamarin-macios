@@ -39,13 +39,21 @@ namespace Xamarin.Linker {
 
 	// Class to contain all the trampoline infos for an assembly
 	// Also between a type and its ID.
+	// TODO: Could this generate the IDs based on the Full name of the type?
 	public class AssemblyTrampolineInfo : List<TrampolineInfo> {
 		Dictionary<TypeDefinition, uint> registered_type_map = new ();
 
 		public TypeDefinition? RegistrarType;
+		private static Dictionary<uint, string> s_calculatedTypeIds = new ();
 
-		public void RegisterType (TypeDefinition td, uint id)
+		public void RegisterType (TypeDefinition td)
 		{
+			// TODO do I already know the type arguments at this point?
+			// how can I match this type to the one in the registrar?
+			// TODO THIS COULD BREAK ALL OF IT
+			var id = ManagedRegistrarHelpers.CalculateTypeId (td.Module.Assembly.Name.Name, td.FullName);
+			// TODO how would we handle collisions in source generators?
+			EnsureUniqueTypeId (td, id);
 			registered_type_map.Add (td, id);
 		}
 
@@ -58,6 +66,19 @@ namespace Xamarin.Linker {
 		{
 			for (var i = 0; i < Count; i++)
 				this [i].Id = i;
+		}
+
+		private static void EnsureUniqueTypeId (TypeDefinition td, uint typeId)
+		{
+			var name = $"[{td.Module.Assembly.Name.Name}]{td.FullName}";
+			lock (s_calculatedTypeIds) {
+				if (s_calculatedTypeIds.TryGetValue(typeId, out var existingName) && existingName != name) {
+					// TODO better error with an error code and all
+					throw new InvalidOperationException($"The type name '{name}' has the same calculated type ID {typeId} (0x2{typeId:X6}) as '{existingName}'.");
+				}
+
+				s_calculatedTypeIds[typeId] = name;
+			}
 		}
 	}
 
@@ -116,7 +137,7 @@ namespace Xamarin.Linker {
 
 			// Mark some stuff we use later on.
 			abr.SetCurrentAssembly (abr.PlatformAssembly);
-			Annotations.Mark (abr.RegistrarHelper_Register.Resolve ());
+			// Annotations.Mark (abr.RegistrarHelper_Register.Resolve ());
 			abr.ClearCurrentAssembly ();
 		}
 

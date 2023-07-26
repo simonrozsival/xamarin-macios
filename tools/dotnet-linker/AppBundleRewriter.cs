@@ -679,14 +679,14 @@ namespace Xamarin.Linker {
 			}
 		}
 
-		public MethodReference RegistrarHelper_Register {
-			get {
-				return GetMethodReference (PlatformAssembly,
-						ObjCRuntime_RegistrarHelper, "Register",
-						isStatic: true,
-						ObjCRuntime_IManagedRegistrar);
-			}
-		}
+		// public MethodReference RegistrarHelper_Register {
+		// 	get {
+		// 		return GetMethodReference (PlatformAssembly,
+		// 				ObjCRuntime_RegistrarHelper, "Register",
+		// 				isStatic: true,
+		// 				ObjCRuntime_IManagedRegistrar);
+		// 	}
+		// }
 
 		public MethodReference IManagedRegistrar_LookupUnmanagedFunction {
 			get {

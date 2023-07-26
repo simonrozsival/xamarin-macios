@@ -104,7 +104,7 @@ namespace Foundation {
 		}
 	}
 
-	abstract class NSAsyncDispatcher : NSDispatcher {
+	public abstract partial class NSAsyncDispatcher : NSDispatcher {
 		readonly GCHandle gch;
 
 		protected NSAsyncDispatcher ()
@@ -157,7 +157,7 @@ namespace Foundation {
 
 	// Use this for asynchronous operations
 	[Register ("__MonoMac_NSAsyncSynchronizationContextDispatcher")]
-	internal sealed class NSAsyncSynchronizationContextDispatcher : NSAsyncDispatcher {
+	public sealed partial class NSAsyncSynchronizationContextDispatcher : NSAsyncDispatcher {
 		SendOrPostCallback d;
 		object state;
 

@@ -1219,7 +1219,7 @@ namespace ObjCRuntime {
 			return null;
 		}
 
-		internal enum MissingCtorResolution {
+		public enum MissingCtorResolution {
 			ThrowConstructor1NotFound,
 			ThrowConstructor2NotFound,
 			Ignore,
@@ -1305,7 +1305,7 @@ namespace ObjCRuntime {
 			}
 		}
 
-		internal static T? ConstructNSObject<T> (IntPtr ptr) where T : NSObject
+		public static T? ConstructNSObject<T> (IntPtr ptr) where T : NSObject
 		{
 			return ConstructNSObject<T> (ptr, typeof (T), MissingCtorResolution.ThrowConstructor1NotFound);
 		}
@@ -1544,6 +1544,8 @@ namespace ObjCRuntime {
 
 		internal static NSObject? GetNSObject (IntPtr ptr, MissingCtorResolution missingCtorResolution, bool evenInFinalizerQueue = false)
 		{
+			Console.WriteLine ($"GetNSObject (ptr: 0x{ptr:x2})");
+
 			if (ptr == IntPtr.Zero)
 				return null;
 
@@ -1576,6 +1578,11 @@ namespace ObjCRuntime {
 			// First check if we got an object of the expected type
 			if (obj is T o)
 				return o;
+
+			if (IsManagedStaticRegistrar && typeof (T) != typeof (NSObject)) {
+				// Make sure the type is registered
+				RuntimeHelpers.RunClassConstructor (typeof (T).TypeHandle);
+			}
 
 			// We either didn't find an object, or it was of the wrong type, so we need to create a new instance.
 
@@ -1632,7 +1639,7 @@ namespace ObjCRuntime {
 		//
 
 		// The 'selector' and 'method' arguments are only used in error messages.
-		static NSObject? GetNSObject (IntPtr ptr, Type target_type, MissingCtorResolution missingCtorResolution, bool evenInFinalizerQueue, bool createNewInstanceIfWrongType, out bool created)
+		public static NSObject? GetNSObject (IntPtr ptr, Type target_type, MissingCtorResolution missingCtorResolution, bool evenInFinalizerQueue, bool createNewInstanceIfWrongType, out bool created)
 		{
 			created = false;
 
@@ -1658,6 +1665,11 @@ namespace ObjCRuntime {
 
 				// We found an instance of the wrong type, and we're asked to not return that.
 				// So fall through to create a new instance instead.
+			}
+
+			if (IsManagedStaticRegistrar && target_type != typeof (NSObject)) {
+				// Make sure the type is registered
+				RuntimeHelpers.RunClassConstructor (target_type.TypeHandle);
 			}
 
 			// Try to get the managed type that correspond to this exact native type
@@ -1694,6 +1706,11 @@ namespace ObjCRuntime {
 				// such a pointer).
 				implementation = target_type;
 			} else {
+				if (IsManagedStaticRegistrar && target_type != typeof (NSObject)) {
+					// Make sure the type is registered
+					RuntimeHelpers.RunClassConstructor (target_type.TypeHandle);
+				}
+				
 				// Lookup the ObjC type of the ptr and see if we can use it.
 				var p = Class.GetClassForObject (ptr);
 
@@ -1878,6 +1895,7 @@ namespace ObjCRuntime {
 				throw ErrorHelper.CreateError (99, Xamarin.Bundler.Errors.MX0099 /* Internal error */, "The managed static registrar is only available for .NET");
 #endif
 			} else {
+				
 				unsafe {
 					var map = options->RegistrationMap;
 					if (map is not null) {

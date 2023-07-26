@@ -155,8 +155,8 @@ namespace Xamarin.Linker {
 			}
 			var lastInstruction = body.Instructions.Last ();
 
-			il.InsertBefore (lastInstruction, il.Create (OpCodes.Newobj, registrarType.GetDefaultInstanceConstructor ()));
-			il.InsertBefore (lastInstruction, il.Create (OpCodes.Call, abr.RegistrarHelper_Register));
+			// il.InsertBefore (lastInstruction, il.Create (OpCodes.Newobj, registrarType.GetDefaultInstanceConstructor ()));
+			// il.InsertBefore (lastInstruction, il.Create (OpCodes.Call, abr.RegistrarHelper_Register));
 		}
 
 		List<TypeData> GetTypesToRegister (TypeDefinition registrarType, AssemblyTrampolineInfo info)
@@ -195,10 +195,9 @@ namespace Xamarin.Linker {
 				types.Add (new (wrapperType, wrapperType.Resolve ()));
 			}
 
-			// TODO this would have to change somehow -> some deterministic IDs?
 			// Now create a mapping from type to index
 			for (var i = 0; i < types.Count; i++)
-				info.RegisterType (types [i].Definition, (uint) i);
+				info.RegisterType (types [i].Definition);
 
 			return types;
 		}
