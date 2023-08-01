@@ -533,16 +533,28 @@ namespace ObjCRuntime {
 
 		static IntPtr GetBlockWrapperCreator (IntPtr method, int parameter)
 		{
+#if NET
+			ManagedRegistrar.ThrowWhenUsingManagedStaticRegistrar ();
+#endif
+
 			return AllocGCHandle (GetBlockWrapperCreator ((MethodInfo) GetGCHandleTarget (method)!, parameter));
 		}
 
 		static IntPtr CreateBlockProxy (IntPtr method, IntPtr block)
 		{
+#if NET
+			ManagedRegistrar.ThrowWhenUsingManagedStaticRegistrar ();
+#endif
+
 			return AllocGCHandle (CreateBlockProxy ((MethodInfo) GetGCHandleTarget (method)!, block));
 		}
 
 		static IntPtr CreateDelegateProxy (IntPtr method, IntPtr @delegate, IntPtr signature, uint token_ref)
 		{
+#if NET
+			ManagedRegistrar.ThrowWhenUsingManagedStaticRegistrar ();
+#endif
+
 			return BlockLiteral.GetBlockForDelegate ((MethodInfo) GetGCHandleTarget (method)!, GetGCHandleTarget (@delegate), token_ref, Marshal.PtrToStringAuto (signature));
 		}
 
@@ -773,6 +785,10 @@ namespace ObjCRuntime {
 
 		static IntPtr GetHandleForINativeObject (IntPtr ptr)
 		{
+#if NET
+			ManagedRegistrar.ThrowWhenUsingManagedStaticRegistrar ();
+#endif
+
 			return ((INativeObject) GetGCHandleTarget (ptr)!).Handle;
 		}
 
@@ -782,7 +798,11 @@ namespace ObjCRuntime {
 		}
 
 		static unsafe IntPtr GetMethodFromToken (uint token_ref)
-		{
+		{	
+#if NET
+			ManagedRegistrar.ThrowWhenUsingManagedStaticRegistrar ();
+#endif
+
 			var method = Class.ResolveMethodTokenReference (token_ref);
 			if (method is not null)
 				return AllocGCHandle (method);
@@ -792,6 +812,10 @@ namespace ObjCRuntime {
 
 		static unsafe IntPtr GetGenericMethodFromToken (IntPtr obj, uint token_ref)
 		{
+#if NET
+			ManagedRegistrar.ThrowWhenUsingManagedStaticRegistrar ();
+#endif
+
 			var method = Class.ResolveMethodTokenReference (token_ref);
 			if (method is null)
 				return IntPtr.Zero;
@@ -818,6 +842,10 @@ namespace ObjCRuntime {
 			/*
 			 * This method is called from marshalling bridge (dynamic mode).
 			 */
+#if NET
+			ManagedRegistrar.ThrowWhenUsingManagedStaticRegistrar ();
+#endif
+
 			var type = (System.Type) GetGCHandleTarget (type_ptr)!;
 			return AllocGCHandle (GetINativeObject (ptr, owns != 0, type, null));
 		}
@@ -827,6 +855,9 @@ namespace ObjCRuntime {
 			/* 
 			 * This method is called from generated code from the static registrar.
 			 */
+#if NET
+			ManagedRegistrar.ThrowWhenUsingManagedStaticRegistrar ();
+#endif
 
 			var iface = Class.ResolveTypeTokenReference (iface_token)!;
 			var type = Class.ResolveTypeTokenReference (implementation_token);
@@ -1979,6 +2010,10 @@ namespace ObjCRuntime {
 		[BindingImpl (BindingImplOptions.Optimizable)]
 		static bool SlowIsUserType (IntPtr cls)
 		{
+// #if NET
+// 			ManagedRegistrar.ThrowWhenUsingManagedStaticRegistrar ();
+// #endif
+
 			unsafe {
 				if (options->RegistrationMap is not null && options->RegistrationMap->map_count > 0) {
 					var map = options->RegistrationMap->map;

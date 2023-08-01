@@ -1960,7 +1960,6 @@ SHARED_SOURCES = \
 	ObjCRuntime/ExceptionMode.cs \
 	ObjCRuntime/ManagedRegistrar.cs \
 	ObjCRuntime/ManagedRegistrar.g.cs \
-	ObjCRuntime/ManagedRegistrarHelpers.cs \
 	ObjCRuntime/Method.cs \
 	ObjCRuntime/Registrar.cs \
 	ObjCRuntime/RegistrarHelper.cs \

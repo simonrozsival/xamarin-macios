@@ -41,44 +41,12 @@ namespace Xamarin.Linker {
 	// Also between a type and its ID.
 	// TODO: Could this generate the IDs based on the Full name of the type?
 	public class AssemblyTrampolineInfo : List<TrampolineInfo> {
-		Dictionary<TypeDefinition, uint> registered_type_map = new ();
-
 		public TypeDefinition? RegistrarType;
-		private static Dictionary<uint, string> s_calculatedTypeIds = new ();
-
-		public void RegisterType (TypeDefinition td)
-		{
-			// TODO do I already know the type arguments at this point?
-			// how can I match this type to the one in the registrar?
-			// TODO THIS COULD BREAK ALL OF IT
-			var id = ManagedRegistrarHelpers.CalculateTypeId (td.Module.Assembly.Name.Name, td.FullName);
-			// TODO how would we handle collisions in source generators?
-			EnsureUniqueTypeId (td, id);
-			registered_type_map.Add (td, id);
-		}
-
-		public bool TryGetRegisteredTypeIndex (TypeDefinition td, out uint id)
-		{
-			return registered_type_map.TryGetValue (td, out id);
-		}
 
 		public void SetIds ()
 		{
 			for (var i = 0; i < Count; i++)
 				this [i].Id = i;
-		}
-
-		private static void EnsureUniqueTypeId (TypeDefinition td, uint typeId)
-		{
-			var name = $"[{td.Module.Assembly.Name.Name}]{td.FullName}";
-			lock (s_calculatedTypeIds) {
-				if (s_calculatedTypeIds.TryGetValue(typeId, out var existingName) && existingName != name) {
-					// TODO better error with an error code and all
-					throw new InvalidOperationException($"The type name '{name}' has the same calculated type ID {typeId} (0x2{typeId:X6}) as '{existingName}'.");
-				}
-
-				s_calculatedTypeIds[typeId] = name;
-			}
 		}
 	}
 
@@ -138,6 +106,7 @@ namespace Xamarin.Linker {
 			// Mark some stuff we use later on.
 			abr.SetCurrentAssembly (abr.PlatformAssembly);
 			// Annotations.Mark (abr.RegistrarHelper_Register.Resolve ());
+			// Annotations.Mark (abr.ManagedRegistrar_Register.Resolve ());
 			abr.ClearCurrentAssembly ();
 		}
 
@@ -220,6 +189,9 @@ namespace Xamarin.Linker {
 					ProcessProperty (prop, methods_to_wrap);
 				}
 			}
+
+			// // Implement the IManagedRegistrarType interface
+			// ImplementIManagedRegistrarType (type);
 
 			// Create an UnmanagedCallersOnly method for each method we need to wrap
 			foreach (var method in methods_to_wrap) {
@@ -1293,6 +1265,93 @@ namespace Xamarin.Linker {
 				if (isManagedNullable)
 					il.Append (endTarget);
 			}
+		}
+		
+		void ImplementIManagedRegistrarType (TypeDefinition typeDefinition)
+		{
+			// Implement the interface
+			typeDefinition.Interfaces.Add (new InterfaceImplementation (abr.ObjCRuntime_IManagedRegistrarType));
+
+			// Implement the CreateNSObject function
+			var nsObjectConstructor = FindNSObjectConstructor (typeDefinition);
+			if (nsObjectConstructor is not null) {
+				var method = typeDefinition.AddMethod ("CreateNSObject", MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig, abr.Foundation_NSObject);
+				method.Overrides.Add (abr.IManagedRegistrarType_CreateNSObject);
+				var handleParameter = method.AddParameter ("handle", abr.ObjCRuntime_NativeHandle);
+
+				_ = method.CreateBody (out var il);
+				il.Emit (OpCodes.Ldarg, handleParameter);
+				il.Emit (OpCodes.Newobj, nsObjectConstructor);
+				il.Emit (OpCodes.Ret);
+			}
+
+			// Implement the CreateINativeObject function
+			var nativeObjectConstructor = FindINativeObjectConstructor (typeDefinition);
+			if (nativeObjectConstructor is not null) {
+				var method = typeDefinition.AddMethod ("CreateINativeObject", MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig, abr.Foundation_NSObject);
+				method.Overrides.Add (abr.IManagedRegistrarType_CreateINativeObject);
+				var handleParameter = method.AddParameter ("handle", abr.ObjCRuntime_NativeHandle);
+				var ownsParameter = method.AddParameter ("owns", abr.System_Boolean);
+
+				_ = method.CreateBody (out var il);
+				il.Emit (OpCodes.Ldarg, handleParameter);
+				il.Emit (OpCodes.Ldarg, ownsParameter);
+				il.Emit (OpCodes.Newobj, nativeObjectConstructor);
+				il.Emit (OpCodes.Ret);
+			}
+			
+			// Static ctor
+			var cctor =
+				typeDefinition.Methods.FirstOrDefault (method => method.IsConstructor && method.IsStatic)
+					?? typeDefinition.AddMethod (".cctor", MethodAttributes.Private | MethodAttributes.Static | MethodAttributes.HideBySig | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName, abr.System_Void);
+
+			{
+				ILProcessor il;
+				if (!cctor.HasBody) {
+					_ = cctor.CreateBody (out il);
+				} else {
+					il = cctor.Body.GetILProcessor ();
+				}
+				
+				if (il.Body.Instructions.Count == 0) {
+					il.Emit (OpCodes.Ret);
+				}
+
+				// Add a call to RegisterType at the very start of the ctor
+				var registerMethod = abr.ManagedRegistrar_Register.CreateGenericInstanceMethod (typeDefinition);
+				var inst = il.Create (OpCodes.Call, registerMethod);
+				il.InsertBefore (il.Body.Instructions [0], inst);
+			}
+		}
+
+		static MethodReference? FindNSObjectConstructor (TypeDefinition type)
+		{
+			return FindConstructorWithOneParameter ("ObjCRuntime", "NativeHandle")
+				?? FindConstructorWithOneParameter ("System", "IntPtr");
+
+			MethodReference? FindConstructorWithOneParameter (string ns, string cls)
+				=> type.Methods.FirstOrDefault (method =>
+					method.IsConstructor
+						&& !method.IsStatic
+						&& method.HasParameters
+						&& method.Parameters.Count == 1
+						&& method.Parameters [0].ParameterType.Is (ns, cls));
+		}
+
+
+		static MethodReference? FindINativeObjectConstructor (TypeDefinition type)
+		{
+			return FindConstructorWithTwoParameters ("ObjCRuntime", "NativeHandle", "System", "Boolean")
+				?? FindConstructorWithTwoParameters ("System", "IntPtr", "System", "Boolean");
+
+			MethodReference? FindConstructorWithTwoParameters (string ns1, string cls1, string ns2, string cls2)
+				=> type.Methods.FirstOrDefault (method =>
+					method.IsConstructor
+						&& !method.IsStatic
+						&& method.HasParameters
+						&& method.Parameters.Count == 2
+						&& method.Parameters [0].ParameterType.Is (ns1, cls1)
+						&& method.Parameters [1].ParameterType.Is (ns2, cls2));
 		}
 	}
 }

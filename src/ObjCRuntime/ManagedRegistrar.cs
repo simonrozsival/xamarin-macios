@@ -12,9 +12,11 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
+using System.Threading;
 
 using Foundation;
 using ObjCRuntime;
@@ -33,20 +35,21 @@ namespace ObjCRuntime {
 	{
 		static virtual NSObject CreateNSObject(NativeHandle handle) => throw new InvalidOperationException ();
 		static virtual INativeObject CreateINativeObject(NativeHandle handle, bool owns) => throw new InvalidOperationException ();
+		static virtual IntPtr GetObjCClass (out bool is_custom_type) => throw new InvalidOperationException ();
 	}
 
 	public sealed class ManagedRegistrar
 	{
-		private Dictionary<RuntimeTypeHandle, uint> _typeIds;
-		private Dictionary<uint, RuntimeTypeHandle> _typeHandles;
+		delegate IntPtr GetObjCClassFunc (out bool is_custom_type);
+
+		private Dictionary<RuntimeTypeHandle, GetObjCClassFunc> _getObjCClasses;
 		private Dictionary<RuntimeTypeHandle, Func<NativeHandle, NSObject>> _nsObjectFactories;
 		private Dictionary<RuntimeTypeHandle, Func<NativeHandle, bool, INativeObject>> _nativeObjectFactories;
 		private Dictionary<RuntimeTypeHandle, RuntimeTypeHandle> _wrapperTypes;
 
 		internal ManagedRegistrar (RuntimeTypeHandleEqualityComparer runtimeTypeHandleEqualityComparer)
 		{
-			_typeIds = new (runtimeTypeHandleEqualityComparer);
-			_typeHandles = new ();
+			_getObjCClasses = new (runtimeTypeHandleEqualityComparer);
 			_nsObjectFactories = new (runtimeTypeHandleEqualityComparer);
 			_nativeObjectFactories = new (runtimeTypeHandleEqualityComparer);
 			_wrapperTypes = new (runtimeTypeHandleEqualityComparer);
@@ -62,6 +65,13 @@ namespace ObjCRuntime {
 			RegistrarHelper.RegisterManagedRegistrarType<T> ();
 		}
 
+		internal static void ThrowWhenUsingManagedStaticRegistrar ([CallerMemberName] string? caller = null)
+		{
+			if (Runtime.IsManagedStaticRegistrar)
+				throw new UnreachableException (
+					$"The method '{caller ?? "<unknown>"}' cannot be called when using the managed static registrar.");
+		}
+
 		internal void AddType<T> ()
 			where T : IManagedRegistrarType
 		{
@@ -72,29 +82,29 @@ namespace ObjCRuntime {
 			if (!type.IsGenericType || type != type.GetGenericTypeDefinition ()) {
 				_nsObjectFactories.Add (type.TypeHandle, T.CreateNSObject);
 				_nativeObjectFactories.Add (type.TypeHandle, T.CreateINativeObject);
+				_getObjCClasses.Add (type.TypeHandle, T.GetObjCClass);
 			} else {
 				Console.WriteLine ($"Registered a generic type {type} without any generic type arguments.");
 			}
+		}
 
-			// we need to erase the generic type arguments so that all of these generic types
-			// map to the same Objective-C class ...
-			if (type.IsGenericType) {
-				var genericType = type.GetGenericTypeDefinition ();
-				var typeId = ManagedRegistrarHelpers.CalculateTypeId (genericType);
-				_typeHandles.Add (typeId, genericType.TypeHandle);
-				Console.WriteLine($"[{type}] Registering mapping typeId={typeId} -> runtimeTypeHandle={genericType.TypeHandle.Value}");
-				_typeIds.Add (type.TypeHandle, typeId); // we want to map all the generic types to the same type ID
-				Console.WriteLine($"[{type}] Registering mapping runtimeTypeHandle={type.TypeHandle.Value} -> typeId={typeId}");
-				_ = _typeIds.TryAdd (genericType.TypeHandle, typeId); // it's possible that this generic type mapping was added already
-				Console.WriteLine($"[{type}] Registering mapping runtimeTypeHandle={genericType.TypeHandle.Value} -> typeId={typeId}");
-				
-			} else {
-				var typeId = ManagedRegistrarHelpers.CalculateTypeId (type);
-				_typeHandles.Add (typeId, type.TypeHandle);
-				Console.WriteLine($"[{type}] Registering mapping typeId={typeId} -> runtimeTypeHandle={type.TypeHandle.Value}");
-				_typeIds.Add (type.TypeHandle, typeId);
-				Console.WriteLine($"[{type}] Registering mapping runtimeTypeHandle={type.TypeHandle.Value} -> typeId={typeId}");
-			}
+		internal IntPtr FindClass (Type type, out bool is_custom_type)
+		{
+			is_custom_type = false;
+			EnsureClassConstructorHasRun (type.TypeHandle);
+
+			if (_getObjCClasses.TryGetValue (type.TypeHandle, out var getObjCClass))
+				return getObjCClass (out is_custom_type);
+
+			ThrowIfGenericType (type);
+			return IntPtr.Zero;
+		}
+
+		internal static Type? FindType (NativeHandle @class, out bool is_custom_type)
+		{
+			is_custom_type = false;
+			var ptr = IntPtr_objc_msgSend_ref_bool (@class, Selector.GetHandle ("getDotnetType:"), ref is_custom_type);
+			return GCHandle.FromIntPtr (ptr).Target as Type;
 		}
 
 		internal NSObject? CreateNSObject(RuntimeTypeHandle runtimeTypeHandle, NativeHandle handle)
@@ -105,7 +115,6 @@ namespace ObjCRuntime {
 				return factory (handle);
 
 			ThrowIfGenericType (runtimeTypeHandle);
-
 			return null;
 		}
 
@@ -117,25 +126,7 @@ namespace ObjCRuntime {
 				return factory (handle, owns);
 
 			ThrowIfGenericType (runtimeTypeHandle);
-
 			return null;
-		}
-
-		internal RuntimeTypeHandle LookupType (uint id)
-		{	
-			// TODO how can I force the static constructor to run?
-			// do we assume that this is not called before the static constructor has run?
-			if (_typeHandles.TryGetValue (id, out var handle))
-				return handle;
-
-			// TODO what exception should we throw??
-			throw new InvalidOperationException ($"No type with ID {id} has been registered.");
-		}
-
-		internal uint LookupTypeId(RuntimeTypeHandle runtimeTypeHandle)
-		{
-			EnsureClassConstructorHasRun(runtimeTypeHandle);
-			return _typeIds[runtimeTypeHandle];
 		}
 
 		internal bool RegisterWrapperType(RuntimeTypeHandle runtimeTypeHandle, Dictionary<RuntimeTypeHandle, RuntimeTypeHandle> wrapperTypes)
@@ -163,7 +154,14 @@ namespace ObjCRuntime {
 		private void ThrowIfGenericType (RuntimeTypeHandle runtimeTypeHandle)
 		{
 			var type = Type.GetTypeFromHandle (runtimeTypeHandle);
-			if (type is not null && type.IsGenericType && type == type.GetGenericTypeDefinition ()) {
+			if (type is not null) {
+				ThrowIfGenericType (type);
+			}
+		}
+
+		private void ThrowIfGenericType (Type type)
+		{
+			if (type.IsGenericType && type == type.GetGenericTypeDefinition ()) {
 				// the type is a generic type without any type arguments
 				// there's no way we can create an instance of such type
 				// so let's just throw...
@@ -174,6 +172,9 @@ namespace ObjCRuntime {
 		// TODO: is this necessary in our use case? it seems it's only used in debug mode with dynamic linking?
 		// Should we register all the entrypoints with the type in the static constructor?
 		internal IntPtr LookupUnmanagedFunction(string? entryPoint, int id) => (IntPtr)(-1);
+
+		[DllImport ("/usr/lib/libobjc.dylib", EntryPoint = "objc_msgSend")]
+		public extern static IntPtr IntPtr_objc_msgSend_ref_bool (IntPtr receiver, IntPtr selector, ref bool p1);
 	}
 }
 

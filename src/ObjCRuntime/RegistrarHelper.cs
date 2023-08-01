@@ -83,6 +83,10 @@ namespace ObjCRuntime {
 
 		static IntPtr GetBlockForDelegate (object @delegate, RuntimeMethodHandle method_handle)
 		{
+#if NET
+			ManagedRegistrar.ThrowWhenUsingManagedStaticRegistrar ();
+#endif
+
 			var method = (MethodInfo) MethodBase.GetMethodFromHandle (method_handle)!;
 			return BlockLiteral.GetBlockForDelegate (method, @delegate, Runtime.INVALID_TOKEN_REF, null);
 		}
@@ -158,17 +162,10 @@ namespace ObjCRuntime {
 			return IntPtr.Zero;
 		}
 
-		internal static Type LookupRegisteredType (Assembly assembly, uint id)
-		{
-			var map = GetOrInitMapInfo (assembly);
-			var handle = map.Registrar.LookupType (id);
-			return Type.GetTypeFromHandle (handle)!;
-		}
-
-		internal static uint LookupRegisteredTypeId (Type type)
+		internal static IntPtr FindClass (Type type, out bool is_custom_type)
 		{
 			var map = GetOrInitMapInfo (type.Assembly);
-			return map.Registrar.LookupTypeId (type.TypeHandle);
+			return map.Registrar.FindClass (type, out is_custom_type);
 		}
 
 		internal static T? ConstructNSObject<T> (IntPtr ptr, Type type)

@@ -134,9 +134,6 @@
     <Compile Include="..\..\src\ObjCRuntime\Registrar.cs">
       <Link>external\src\ObjCRuntime\Registrar.cs</Link>
     </Compile>
-    <Compile Include="..\..\src\ObjCRuntime\ManagedRegistrarHelpers.cs">
-      <Link>external\src\ObjCRuntime\ManagedRegistrarHelpers.cs</Link>
-    </Compile>
     <Compile Include="..\..\src\ObjCRuntime\Registrar.core.cs">
       <Link>external\src\ObjCRuntime\Registrar.core.cs</Link>
     </Compile>

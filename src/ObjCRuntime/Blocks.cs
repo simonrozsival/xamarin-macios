@@ -398,6 +398,10 @@ namespace ObjCRuntime {
 
 		static Type GetDelegateProxyType (MethodInfo minfo, uint token_ref, out MethodInfo baseMethod)
 		{
+#if NET
+			ManagedRegistrar.ThrowWhenUsingManagedStaticRegistrar ();
+#endif
+			
 			// A mirror of this method is also implemented in StaticRegistrar:GetDelegateProxyType
 			// If this method is changed, that method will probably have to be updated too (tests!!!)
 			baseMethod = null;
@@ -486,6 +490,10 @@ namespace ObjCRuntime {
 		[BindingImpl (BindingImplOptions.Optimizable)]
 		internal static IntPtr GetBlockForDelegate (MethodInfo minfo, object @delegate, uint token_ref, string signature)
 		{
+#if NET
+			ManagedRegistrar.ThrowWhenUsingManagedStaticRegistrar ();
+#endif
+
 			if (@delegate is null)
 				return IntPtr.Zero;
 

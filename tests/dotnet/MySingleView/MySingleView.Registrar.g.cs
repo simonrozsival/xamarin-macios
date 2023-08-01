@@ -9,26 +9,67 @@ using System.Runtime.CompilerServices;
 using Foundation;
 using ObjCRuntime;
 using UIKit;
+using MySingleView;
 
 namespace MySingleView
 {
 	partial class AppDelegate : ObjCRuntime.IManagedRegistrarType
 	{
 		// Important: If the type has its own static ctor, the `RegisterType` method must be called manually.
-		static AppDelegate() => ManagedRegistrar.Register<AppDelegate>();
-		public static new NSObject CreateNSObject(NativeHandle handle) => new AppDelegate(handle);
-		public static new uint TypeId => 0u;
+		// e.g. MessageSummaryView has a static ctor
+		// BUT: - we need to make this specific to the ManagedStaticRegistrar
+
+		// static ManagedStaticRegistrar() {
+		// 	// ... existing code
+		// 	// ...
+
+		// 	if (Runtime.IsManagedStaticRegistrar) {
+		// 		var instance = ManagedRegistrar.Register<T> ();
+		// 	}
+		// }
+
+		static AppDelegate () => ManagedRegistrar.Register<AppDelegate> ();
+		public static new NSObject CreateNSObject (NativeHandle handle) => new AppDelegate (handle);
 
 		// used instead of the [Export("init")] ctor from NSObject in an UCO
 		// the base ctor doesn't take the native handle as a param, now we force it to do so...
-		internal AppDelegate(ObjCRuntime.ManagedRegistrarHandleWrapper handle) : base((NativeHandle)handle)
+		internal AppDelegate (ObjCRuntime.ManagedRegistrarHandleWrapper handle) : base ((NativeHandle)handle)
 		{
 		}
 
+		// TODO where did this constructor come from in the original code?
 		protected internal AppDelegate (NativeHandle handle) : base (handle)
 		{
 		}
+
+		public static new IntPtr GetObjCClass (out bool is_custom_type) => get_objc_class_MySingleView_AppDelegate (out is_custom_type);
+
+		[DllImport("__Internal")]
+		private static extern IntPtr get_objc_class_MySingleView_AppDelegate (out bool is_custom_type);
 	}
+
+	// partial class CustomGenericNSObject<T1, T2> : ObjCRuntime.IManagedRegistrarType
+	// {
+	// 	static CustomGenericNSObject() => ManagedRegistrar.Register<CustomGenericNSObject<T1, T2>> ();
+	// 	public static NSObject CreateNSObject (NativeHandle handle) {
+	// 		Console.WriteLine ($"creating a new instance via CustomGenericNSObject<{typeof(T1).Name}, {typeof(T2).Name}>.CreateNSObject({handle})");
+	// 		return new CustomGenericNSObject<T1, T2> (handle);
+	// 	}
+
+	// 	public static IntPtr GetObjCClass (out bool is_custom_type) => get_objc_class_MySingleView_CustomGenericNSObject_2 (out is_custom_type);
+
+	// 	[DllImport("__Internal")]
+	// 	private static extern IntPtr get_objc_class_MySingleView_CustomGenericNSObject_2 (out bool is_custom_type);
+	// }
+
+	interface IGetDotnetType {
+		Type GetDotnetType ();
+	}
+
+	// partial class CustomGenericNSObject<T1, T2> : IGetDotnetType
+	// {
+	// 	public Type GetDotnetType () => typeof (CustomGenericNSObject<T1, T2>);
+	// }
 }
 
 namespace ObjCRuntime
@@ -38,7 +79,7 @@ namespace ObjCRuntime
 		[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_AppDelegate_FinishedLaunching")]
 		public unsafe static byte callback_MySingleView_AppDelegate_FinishedLaunching(IntPtr pobj, IntPtr sel, IntPtr p0, IntPtr p1, IntPtr* exception_gchandle)
 		{
-			// var methodHandle = typeof(MySingleView.AppDelegate).GetMethod(nameof(MySingleView.AppDelegate.FinishedLaunching))!.MethodHandle; // ?? how to do thsi without reflection?
+			// var methodHandle = MySingleView.AppDelegate.FinishedLaunching.GetMethodInfo().MethodHandle; // ?? how to do thsi without reflection?
 			RuntimeMethodHandle methodHandle = default;
 			try
 			{
@@ -66,7 +107,7 @@ namespace ObjCRuntime
 				}
 				// AppDelegate appDelegate = NSObject.AllocateNSObject<AppDelegate>(pobj);
 				// appDelegate..ctor();
-				MySingleView.AppDelegate appDelegate = new MySingleView.AppDelegate((ManagedRegistrarHandleWrapper)pobj);
+				MySingleView.AppDelegate appDelegate = new MySingleView.AppDelegate(new ObjCRuntime.ManagedRegistrarHandleWrapper (new NativeHandle (pobj)));
 				return NativeObjectExtensions.GetHandle(appDelegate);
 			}
 			catch (Exception ex)
@@ -75,7 +116,45 @@ namespace ObjCRuntime
 			}
 			return default(NativeHandle);
 		}
+
+		[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_AppDelegate_GetDotnetType")]
+		public unsafe static IntPtr callback_MySingleView_AppDelegate_GetDotnetType(IntPtr pobj, IntPtr sel, IntPtr* exception_gchandle)
+		{
+			try
+			{
+				return Runtime.AllocGCHandle (typeof (MySingleView.AppDelegate));
+			}
+			catch (Exception ex)
+			{
+				*exception_gchandle = Runtime.AllocGCHandle(ex);
+			}
+			return IntPtr.Zero;
+		}
 	}
+
+	// public static class MySingleView_CustomGenericNSObject_2__Registrar_Callbacks__
+	// {
+	// 	[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_CustomGenericNSObject_2_GetDotnetType")]
+	// 	public unsafe static IntPtr callback_MySingleView_CustomGenericNSObject_2_GetDotnetType(IntPtr pobj, IntPtr sel, IntPtr* exception_gchandle)
+	// 	{
+	// 		try
+	// 		{
+	// 			if (Runtime.HasNSObject (pobj) != 0) {
+	// 				IGetDotnetType obj = (IGetDotnetType) Runtime.GetNSObject (pobj);
+	// 				return Runtime.AllocGCHandle (obj.GetDotnetType ());
+	// 			}
+
+	// 			// does this even make sense?
+	// 			// all of the generic params should be constrained to NSObjects if I'm not wrong...
+	// 			return Runtime.AllocGCHandle (typeof (MySingleView.CustomGenericNSObject<Foundation.NSObject, Foundation.NSObject>));
+	// 		}
+	// 		catch (Exception ex)
+	// 		{
+	// 			*exception_gchandle = Runtime.AllocGCHandle(ex);
+	// 		}
+	// 		return IntPtr.Zero;
+	// 	}
+	// }
 
 #if __MACCATALYST__
 	internal sealed class AppKit_ActionDispatcher__Registrar_Callbacks__
@@ -130,6 +209,20 @@ namespace ObjCRuntime
 			}
 			return default(byte);
 		}
+
+		[UnmanagedCallersOnly(EntryPoint = "_callback___monomac_internal_ActionDispatcher_GetDotnetType")]
+		public unsafe static IntPtr callback_AppKit_ActionDispatcher_GetDotnetType(IntPtr pobj, IntPtr sel, IntPtr* exception_gchandle)
+		{
+			try
+			{
+				return Runtime.AllocGCHandle (typeof (AppKit.ActionDispatcher));
+			}
+			catch (Exception ex)
+			{
+				*exception_gchandle = Runtime.AllocGCHandle(ex);
+			}
+			return IntPtr.Zero;
+		}
 	}
 #endif
 
@@ -147,7 +240,7 @@ namespace ObjCRuntime
 				}
 				// UIApplicationDelegate uIApplicationDelegate = NSObject.AllocateNSObject<UIApplicationDelegate>(pobj);
 				// uIApplicationDelegate..ctor();
-				UIKit.UIApplicationDelegate uIApplicationDelegate = new UIKit.UIApplicationDelegate((ManagedRegistrarHandleWrapper)pobj);
+				UIKit.UIApplicationDelegate uIApplicationDelegate = new UIKit.UIApplicationDelegate(new ManagedRegistrarHandleWrapper (new NativeHandle (pobj)));
 				return NativeObjectExtensions.GetHandle(uIApplicationDelegate);
 			}
 			catch (Exception ex)
@@ -155,6 +248,20 @@ namespace ObjCRuntime
 				*exception_gchandle = Runtime.AllocGCHandle(ex);
 			}
 			return default(NativeHandle);
+		}
+
+		[UnmanagedCallersOnly(EntryPoint = "_callback_Microsoft_MacCatalyst__UIKit_UIApplicationDelegate_GetDotnetType")]
+		public unsafe static IntPtr callback_UIKit_UIApplicationDelegate_GetDotnetType(IntPtr pobj, IntPtr sel, IntPtr* exception_gchandle)
+		{
+			try
+			{
+				return Runtime.AllocGCHandle (typeof (UIKit.UIApplicationDelegate));
+			}
+			catch (Exception ex)
+			{
+				*exception_gchandle = Runtime.AllocGCHandle(ex);
+			}
+			return IntPtr.Zero;
 		}
 	}
 
@@ -174,6 +281,20 @@ namespace ObjCRuntime
 			{
 				*exception_gchandle = Runtime.AllocGCHandle(ex);
 			}
+		}
+
+		[UnmanagedCallersOnly(EntryPoint = "_callback_UIKit_UIControlEventProxy_GetDotnetType")]
+		public unsafe static IntPtr callback_UIKit_UIControlEventProxy_GetDotnetType(IntPtr pobj, IntPtr sel, IntPtr* exception_gchandle)
+		{
+			try
+			{
+				return Runtime.AllocGCHandle (typeof (UIKit.UIControlEventProxy));
+			}
+			catch (Exception ex)
+			{
+				*exception_gchandle = Runtime.AllocGCHandle(ex);
+			}
+			return IntPtr.Zero;
 		}
 	}
 
@@ -217,6 +338,20 @@ namespace ObjCRuntime
 				*exception_gchandle = Runtime.AllocGCHandle(ex);
 			}
 		}
+
+		[UnmanagedCallersOnly(EntryPoint = "_callback_Foundation_NSDispatcher_GetDotnetType")]
+		public unsafe static IntPtr callback_Foundation_NSDispatcher_GetDotnetType(IntPtr pobj, IntPtr sel, IntPtr* exception_gchandle)
+		{
+			try
+			{
+				return Runtime.AllocGCHandle (typeof (Foundation.NSDispatcher));
+			}
+			catch (Exception ex)
+			{
+				*exception_gchandle = Runtime.AllocGCHandle(ex);
+			}
+			return IntPtr.Zero;
+		}
 	}
 
 	internal sealed class Foundation_NSAsyncDispatcher__Registrar_Callbacks__
@@ -258,6 +393,20 @@ namespace ObjCRuntime
 			{
 				*exception_gchandle = Runtime.AllocGCHandle(ex);
 			}
+		}
+
+		[UnmanagedCallersOnly(EntryPoint = "_callback_Foundation_NSAsyncDispatcher_GetDotnetType")]
+		public unsafe static IntPtr callback_Foundation_NSAsyncDispatcher_GetDotnetType(IntPtr pobj, IntPtr sel, IntPtr* exception_gchandle)
+		{
+			try
+			{
+				return Runtime.AllocGCHandle (typeof (Foundation.NSAsyncDispatcher));
+			}
+			catch (Exception ex)
+			{
+				*exception_gchandle = Runtime.AllocGCHandle(ex);
+			}
+			return IntPtr.Zero;
 		}
 	}
 
@@ -301,6 +450,20 @@ namespace ObjCRuntime
 				*exception_gchandle = Runtime.AllocGCHandle(ex);
 			}
 		}
+
+		[UnmanagedCallersOnly(EntryPoint = "_callback___MonoMac_NSAsyncSynchronizationContextDispatcher_GetDotnetType")]
+		public unsafe static IntPtr callback_Foundation_NSAsyncSynchronizationContextDispatcher_GetDotnetType(IntPtr pobj, IntPtr sel, IntPtr* exception_gchandle)
+		{
+			try
+			{
+				return Runtime.AllocGCHandle (typeof (Foundation.NSAsyncSynchronizationContextDispatcher));
+			}
+			catch (Exception ex)
+			{
+				*exception_gchandle = Runtime.AllocGCHandle(ex);
+			}
+			return IntPtr.Zero;
+		}
 	}
 
 	internal sealed class Foundation_NSSynchronizationContextDispatcher__Registrar_Callbacks__
@@ -319,6 +482,20 @@ namespace ObjCRuntime
 			{
 				*exception_gchandle = Runtime.AllocGCHandle(ex);
 			}
+		}
+
+		[UnmanagedCallersOnly(EntryPoint = "_callback___MonoMac_NSSynchronizationContextDispatcher_GetDotnetType")]
+		public unsafe static IntPtr callback_Foundation_NSSynchronizationContextDispatcher_GetDotnetType(IntPtr pobj, IntPtr sel, IntPtr* exception_gchandle)
+		{
+			try
+			{
+				return Runtime.AllocGCHandle (typeof (Foundation.NSSynchronizationContextDispatcher));
+			}
+			catch (Exception ex)
+			{
+				*exception_gchandle = Runtime.AllocGCHandle(ex);
+			}
+			return IntPtr.Zero;
 		}
 	}
 	
@@ -359,6 +536,224 @@ namespace ObjCRuntime
 			{
 				*exception_gchandle = Runtime.AllocGCHandle(ex);
 			}
+		}
+
+		[UnmanagedCallersOnly(EntryPoint = "_callback___NSObject_Disposer_GetDotnetType")]
+		public unsafe static IntPtr callback_Foundation_NSObject_NSObject_Disposer_GetDotnetType(IntPtr pobj, IntPtr sel, IntPtr* exception_gchandle)
+		{
+			try
+			{
+				return Runtime.AllocGCHandle (typeof (Foundation.NSObject.NSObject_Disposer));
+			}
+			catch (Exception ex)
+			{
+				*exception_gchandle = Runtime.AllocGCHandle(ex);
+			}
+			return IntPtr.Zero;
+		}
+	}
+	
+	internal sealed class Foundation_NSException__Registrar_Callbacks__
+	{
+		[UnmanagedCallersOnly(EntryPoint = "_callback_Foundation_NSException_GetDotnetType")]
+		public unsafe static IntPtr callback_Foundation_NSException_GetDotnetType(IntPtr pobj, IntPtr sel, IntPtr* exception_gchandle)
+		{
+			try
+			{
+				return Runtime.AllocGCHandle (typeof (Foundation.NSException));
+			}
+			catch (Exception ex)
+			{
+				*exception_gchandle = Runtime.AllocGCHandle(ex);
+			}
+			return IntPtr.Zero;
+		}
+	}
+
+	internal sealed class UIKit_UIApplication__Registrar_Callbacks__
+	{
+		[UnmanagedCallersOnly(EntryPoint = "_callback_UIKit_UIApplication_GetDotnetType")]
+		public unsafe static IntPtr callback_UIKit_UIApplication_GetDotnetType(IntPtr pobj, IntPtr sel, IntPtr* exception_gchandle)
+		{
+			try
+			{
+				return Runtime.AllocGCHandle (typeof (UIKit.UIApplication));
+			}
+			catch (Exception ex)
+			{
+				*exception_gchandle = Runtime.AllocGCHandle(ex);
+			}
+			return IntPtr.Zero;
+		}
+	}
+
+	internal sealed class UIKit_UIResponder__Registrar_Callbacks__
+	{
+		[UnmanagedCallersOnly(EntryPoint = "_callback_UIKit_UIResponder_GetDotnetType")]
+		public unsafe static IntPtr callback_UIKit_UIResponder_GetDotnetType(IntPtr pobj, IntPtr sel, IntPtr* exception_gchandle)
+		{
+			try
+			{
+				return Runtime.AllocGCHandle (typeof (UIKit.UIResponder));
+			}
+			catch (Exception ex)
+			{
+				*exception_gchandle = Runtime.AllocGCHandle(ex);
+			}
+			return IntPtr.Zero;
+		}
+	}
+
+	internal sealed class UIKit_UIViewController__Registrar_Callbacks__
+	{
+		[UnmanagedCallersOnly(EntryPoint = "_callback_UIKit_UIViewController_GetDotnetType")]
+		public unsafe static IntPtr callback_UIKit_UIViewController_GetDotnetType(IntPtr pobj, IntPtr sel, IntPtr* exception_gchandle)
+		{
+			try
+			{
+				return Runtime.AllocGCHandle (typeof (UIKit.UIViewController));
+			}
+			catch (Exception ex)
+			{
+				*exception_gchandle = Runtime.AllocGCHandle(ex);
+			}
+			return IntPtr.Zero;
+		}
+	}
+
+	internal sealed class UIKit_UIView__Registrar_Callbacks__
+	{
+		[UnmanagedCallersOnly(EntryPoint = "_callback_UIKit_UIView_GetDotnetType")]
+		public unsafe static IntPtr callback_UIKit_UIView_GetDotnetType(IntPtr pobj, IntPtr sel, IntPtr* exception_gchandle)
+		{
+			try
+			{
+				return Runtime.AllocGCHandle (typeof (UIKit.UIView));
+			}
+			catch (Exception ex)
+			{
+				*exception_gchandle = Runtime.AllocGCHandle(ex);
+			}
+			return IntPtr.Zero;
+		}
+	}
+
+	internal sealed class UIKit_UIControl__Registrar_Callbacks__
+	{
+		[UnmanagedCallersOnly(EntryPoint = "_callback_UIKit_UIControl_GetDotnetType")]
+		public unsafe static IntPtr callback_UIKit_UIControl_GetDotnetType(IntPtr pobj, IntPtr sel, IntPtr* exception_gchandle)
+		{
+			try
+			{
+				return Runtime.AllocGCHandle (typeof (UIKit.UIControl));
+			}
+			catch (Exception ex)
+			{
+				*exception_gchandle = Runtime.AllocGCHandle(ex);
+			}
+			return IntPtr.Zero;
+		}
+	}
+
+	internal sealed class UIKit_UIButton__Registrar_Callbacks__
+	{
+		[UnmanagedCallersOnly(EntryPoint = "_callback_UIKit_UIButton_GetDotnetType")]
+		public unsafe static IntPtr callback_UIKit_UIButton_GetDotnetType(IntPtr pobj, IntPtr sel, IntPtr* exception_gchandle)
+		{
+			try
+			{
+				return Runtime.AllocGCHandle (typeof (UIKit.UIButton));
+			}
+			catch (Exception ex)
+			{
+				*exception_gchandle = Runtime.AllocGCHandle(ex);
+			}
+			return IntPtr.Zero;
+		}
+	}
+
+	internal sealed class UIKit_UIScreen__Registrar_Callbacks__
+	{
+		[UnmanagedCallersOnly(EntryPoint = "_callback_UIKit_UIScreen_GetDotnetType")]
+		public unsafe static IntPtr callback_UIKit_UIScreen_GetDotnetType(IntPtr pobj, IntPtr sel, IntPtr* exception_gchandle)
+		{
+			try
+			{
+				return Runtime.AllocGCHandle (typeof (UIKit.UIScreen));
+			}
+			catch (Exception ex)
+			{
+				*exception_gchandle = Runtime.AllocGCHandle(ex);
+			}
+			return IntPtr.Zero;
+		}
+	}
+
+	internal sealed class UIKit_UIWindow__Registrar_Callbacks__
+	{
+		[UnmanagedCallersOnly(EntryPoint = "_callback_UIKit_UIWindow_GetDotnetType")]
+		public unsafe static IntPtr callback_UIKit_UIWindow_GetDotnetType(IntPtr pobj, IntPtr sel, IntPtr* exception_gchandle)
+		{
+			try
+			{
+				return Runtime.AllocGCHandle (typeof (UIKit.UIWindow));
+			}
+			catch (Exception ex)
+			{
+				*exception_gchandle = Runtime.AllocGCHandle(ex);
+			}
+			return IntPtr.Zero;
+		}
+	}
+
+	internal sealed class Foundation_NSRunLoop__Registrar_Callbacks__
+	{
+		[UnmanagedCallersOnly(EntryPoint = "_callback_Foundation_NSRunLoop_GetDotnetType")]
+		public unsafe static IntPtr callback_Foundation_NSRunLoop_GetDotnetType(IntPtr pobj, IntPtr sel, IntPtr* exception_gchandle)
+		{
+			try
+			{
+				return Runtime.AllocGCHandle (typeof (Foundation.NSRunLoop));
+			}
+			catch (Exception ex)
+			{
+				*exception_gchandle = Runtime.AllocGCHandle(ex);
+			}
+			return IntPtr.Zero;
+		}
+	}
+
+	internal sealed class Foundation_NSAutoreleasePool__Registrar_Callbacks__
+	{
+		[UnmanagedCallersOnly(EntryPoint = "_callback_Foundation_NSAutoreleasePool_GetDotnetType")]
+		public unsafe static IntPtr callback_Foundation_NSAutoreleasePool_GetDotnetType(IntPtr pobj, IntPtr sel, IntPtr* exception_gchandle)
+		{
+			try
+			{
+				return Runtime.AllocGCHandle (typeof (Foundation.NSAutoreleasePool));
+			}
+			catch (Exception ex)
+			{
+				*exception_gchandle = Runtime.AllocGCHandle(ex);
+			}
+			return IntPtr.Zero;
+		}
+	}
+
+	internal sealed class Foundation_NSDictionary__Registrar_Callbacks__
+	{
+		[UnmanagedCallersOnly(EntryPoint = "_callback_Foundation_NSDictionary_GetDotnetType")]
+		public unsafe static IntPtr callback_Foundation_NSDictionary_GetDotnetType(IntPtr pobj, IntPtr sel, IntPtr* exception_gchandle)
+		{
+			try
+			{
+				return Runtime.AllocGCHandle (typeof (Foundation.NSDictionary));
+			}
+			catch (Exception ex)
+			{
+				*exception_gchandle = Runtime.AllocGCHandle(ex);
+			}
+			return IntPtr.Zero;
 		}
 	}
 }

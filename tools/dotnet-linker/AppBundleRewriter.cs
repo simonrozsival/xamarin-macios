@@ -339,6 +339,12 @@ namespace Xamarin.Linker {
 			}
 		}
 
+		public TypeReference ObjCRuntime_ManagedRegistrar {
+			get {
+				return GetTypeReference (PlatformAssembly, "ObjCRuntime.ManagedRegistrar", out var _);
+			}
+		}
+
 		public TypeReference ObjCRuntime_INativeObject {
 			get {
 				return GetTypeReference (PlatformAssembly, "ObjCRuntime.INativeObject", out var _);
@@ -375,6 +381,12 @@ namespace Xamarin.Linker {
 			}
 		}
 
+		public TypeReference ObjCRuntime_IManagedRegistrarType {
+			get {
+				return GetTypeReference (PlatformAssembly, "ObjCRuntime.IManagedRegistrarType", out var _);
+			}
+		}
+
 		/* Methods */
 
 		public MethodReference System_Object__ctor {
@@ -408,6 +420,18 @@ namespace Xamarin.Linker {
 						&& v.HasParameters
 						&& v.Parameters.Count == 2
 						&& !v.HasGenericParameters);
+			}
+		}
+
+		public MethodReference IManagedRegistrarType_CreateINativeObject {
+			get {
+				return GetMethodReference (CorlibAssembly, ObjCRuntime_IManagedRegistrarType, "CreateINativeObject");
+			}
+		}
+
+		public MethodReference IManagedRegistrarType_CreateNSObject {
+			get {
+				return GetMethodReference (CorlibAssembly, ObjCRuntime_IManagedRegistrarType, "CreateNSObject");
 			}
 		}
 
@@ -679,14 +703,15 @@ namespace Xamarin.Linker {
 			}
 		}
 
-		// public MethodReference RegistrarHelper_Register {
-		// 	get {
-		// 		return GetMethodReference (PlatformAssembly,
-		// 				ObjCRuntime_RegistrarHelper, "Register",
-		// 				isStatic: true,
-		// 				ObjCRuntime_IManagedRegistrar);
-		// 	}
-		// }
+		public MethodReference ManagedRegistrar_Register {
+			get {
+				return GetMethodReference (PlatformAssembly, ObjCRuntime_ManagedRegistrar, "Register",
+					(v) => v.IsStatic
+						&& !v.HasParameters
+						&& v.HasGenericParameters
+						&& v.GenericParameters.Count == 1);
+			}
+		}
 
 		public MethodReference IManagedRegistrar_LookupUnmanagedFunction {
 			get {
@@ -695,24 +720,6 @@ namespace Xamarin.Linker {
 						isStatic: false,
 						System_String,
 						System_Int32);
-			}
-		}
-
-		public MethodReference IManagedRegistrar_LookupType {
-			get {
-				return GetMethodReference (PlatformAssembly,
-						ObjCRuntime_IManagedRegistrar, "LookupType",
-						isStatic: false,
-						System_UInt32);
-			}
-		}
-
-		public MethodReference IManagedRegistrar_LookupTypeId {
-			get {
-				return GetMethodReference (PlatformAssembly,
-						ObjCRuntime_IManagedRegistrar, "LookupTypeId",
-						isStatic: false,
-						System_RuntimeTypeHandle);
 			}
 		}
 
