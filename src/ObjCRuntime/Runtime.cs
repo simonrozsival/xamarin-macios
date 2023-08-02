@@ -232,6 +232,15 @@ namespace ObjCRuntime {
 			}
 		}
 
+		internal static void ThrowIfManagedStaticRegistrar ([CallerMemberName] string? caller = null)
+		{
+#if NET
+			if (Runtime.IsManagedStaticRegistrar)
+				throw new UnreachableException (
+					$"The method '{caller ?? "<unknown>"}' cannot be called when using the managed static registrar.");
+#endif
+		}
+
 		[BindingImpl (BindingImplOptions.Optimizable)]
 		public static bool DynamicRegistrationSupported {
 			get {
@@ -533,27 +542,21 @@ namespace ObjCRuntime {
 
 		static IntPtr GetBlockWrapperCreator (IntPtr method, int parameter)
 		{
-#if NET
-			ManagedRegistrar.ThrowWhenUsingManagedStaticRegistrar ();
-#endif
+			Runtime.ThrowIfManagedStaticRegistrar ();
 
 			return AllocGCHandle (GetBlockWrapperCreator ((MethodInfo) GetGCHandleTarget (method)!, parameter));
 		}
 
 		static IntPtr CreateBlockProxy (IntPtr method, IntPtr block)
 		{
-#if NET
-			ManagedRegistrar.ThrowWhenUsingManagedStaticRegistrar ();
-#endif
+			Runtime.ThrowIfManagedStaticRegistrar ();
 
 			return AllocGCHandle (CreateBlockProxy ((MethodInfo) GetGCHandleTarget (method)!, block));
 		}
 
 		static IntPtr CreateDelegateProxy (IntPtr method, IntPtr @delegate, IntPtr signature, uint token_ref)
 		{
-#if NET
-			ManagedRegistrar.ThrowWhenUsingManagedStaticRegistrar ();
-#endif
+			Runtime.ThrowIfManagedStaticRegistrar ();
 
 			return BlockLiteral.GetBlockForDelegate ((MethodInfo) GetGCHandleTarget (method)!, GetGCHandleTarget (@delegate), token_ref, Marshal.PtrToStringAuto (signature));
 		}
@@ -785,10 +788,6 @@ namespace ObjCRuntime {
 
 		static IntPtr GetHandleForINativeObject (IntPtr ptr)
 		{
-#if NET
-			ManagedRegistrar.ThrowWhenUsingManagedStaticRegistrar ();
-#endif
-
 			return ((INativeObject) GetGCHandleTarget (ptr)!).Handle;
 		}
 
@@ -799,9 +798,7 @@ namespace ObjCRuntime {
 
 		static unsafe IntPtr GetMethodFromToken (uint token_ref)
 		{	
-#if NET
-			ManagedRegistrar.ThrowWhenUsingManagedStaticRegistrar ();
-#endif
+			Runtime.ThrowIfManagedStaticRegistrar ();
 
 			var method = Class.ResolveMethodTokenReference (token_ref);
 			if (method is not null)
@@ -812,9 +809,7 @@ namespace ObjCRuntime {
 
 		static unsafe IntPtr GetGenericMethodFromToken (IntPtr obj, uint token_ref)
 		{
-#if NET
-			ManagedRegistrar.ThrowWhenUsingManagedStaticRegistrar ();
-#endif
+			Runtime.ThrowIfManagedStaticRegistrar ();
 
 			var method = Class.ResolveMethodTokenReference (token_ref);
 			if (method is null)
@@ -842,9 +837,7 @@ namespace ObjCRuntime {
 			/*
 			 * This method is called from marshalling bridge (dynamic mode).
 			 */
-#if NET
-			ManagedRegistrar.ThrowWhenUsingManagedStaticRegistrar ();
-#endif
+			Runtime.ThrowIfManagedStaticRegistrar ();
 
 			var type = (System.Type) GetGCHandleTarget (type_ptr)!;
 			return AllocGCHandle (GetINativeObject (ptr, owns != 0, type, null));
@@ -855,9 +848,7 @@ namespace ObjCRuntime {
 			/* 
 			 * This method is called from generated code from the static registrar.
 			 */
-#if NET
-			ManagedRegistrar.ThrowWhenUsingManagedStaticRegistrar ();
-#endif
+			Runtime.ThrowIfManagedStaticRegistrar ();
 
 			var iface = Class.ResolveTypeTokenReference (iface_token)!;
 			var type = Class.ResolveTypeTokenReference (implementation_token);
@@ -1598,7 +1589,6 @@ namespace ObjCRuntime {
 			return GetNSObject<T> (ptr, sel, method_handle, false);
 		}
 
-		// TODO does this need to be public?
 		public static T? GetNSObject<T> (IntPtr ptr, IntPtr sel, RuntimeMethodHandle method_handle, bool evenInFinalizerQueue) where T : NSObject
 		{
 			if (ptr == IntPtr.Zero)
@@ -1670,7 +1660,7 @@ namespace ObjCRuntime {
 		//
 
 		// The 'selector' and 'method' arguments are only used in error messages.
-		public static NSObject? GetNSObject (IntPtr ptr, Type target_type, MissingCtorResolution missingCtorResolution, bool evenInFinalizerQueue, bool createNewInstanceIfWrongType, out bool created)
+		static NSObject? GetNSObject (IntPtr ptr, Type target_type, MissingCtorResolution missingCtorResolution, bool evenInFinalizerQueue, bool createNewInstanceIfWrongType, out bool created)
 		{
 			created = false;
 
@@ -2010,10 +2000,12 @@ namespace ObjCRuntime {
 		[BindingImpl (BindingImplOptions.Optimizable)]
 		static bool SlowIsUserType (IntPtr cls)
 		{
-// #if NET
-// 			ManagedRegistrar.ThrowWhenUsingManagedStaticRegistrar ();
-// #endif
-
+#if NET
+			if (Runtime.IsManagedStaticRegistrar) {
+				_ = RegistrarHelper.FindType (cls, out var isCustomType);
+				return isCustomType;
+			}
+#endif
 			unsafe {
 				if (options->RegistrationMap is not null && options->RegistrationMap->map_count > 0) {
 					var map = options->RegistrationMap->map;

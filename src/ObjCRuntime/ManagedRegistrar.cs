@@ -8,6 +8,8 @@
 
 #if NET
 
+#define TRACE
+
 #nullable enable
 
 using System;
@@ -22,69 +24,56 @@ using Foundation;
 using ObjCRuntime;
 
 namespace ObjCRuntime {
-	// The ManagedRegistrarHandleWrapper needs to be unique in the codebase. If the developer uses it in their codebase
-	// they could break things. Maybe there could be an analzyer that'll check if it is being used somewhere 
-	public struct ManagedRegistrarHandleWrapper
-	{
-		private readonly NativeHandle _handle;
-		public ManagedRegistrarHandleWrapper (NativeHandle handle) => _handle = handle;
-		public static explicit operator NativeHandle (ManagedRegistrarHandleWrapper wrapper) => wrapper._handle;
-	}
-
 	public interface IManagedRegistrarType
 	{
 		static virtual NSObject CreateNSObject(NativeHandle handle) => throw new InvalidOperationException ();
 		static virtual INativeObject CreateINativeObject(NativeHandle handle, bool owns) => throw new InvalidOperationException ();
-		static virtual IntPtr GetObjCClass (out bool is_custom_type) => throw new InvalidOperationException ();
+		static virtual IntPtr GetNativeClass (out bool is_custom_type) => throw new InvalidOperationException ();
 	}
 
-	public sealed class ManagedRegistrar
+	internal sealed class ManagedRegistrar
 	{
-		delegate IntPtr GetObjCClassFunc (out bool is_custom_type);
+		private readonly SemaphoreSlim _semaphore = new SemaphoreSlim (1, 1);
 
-		private Dictionary<RuntimeTypeHandle, GetObjCClassFunc> _getObjCClasses;
-		private Dictionary<RuntimeTypeHandle, Func<NativeHandle, NSObject>> _nsObjectFactories;
-		private Dictionary<RuntimeTypeHandle, Func<NativeHandle, bool, INativeObject>> _nativeObjectFactories;
-		private Dictionary<RuntimeTypeHandle, RuntimeTypeHandle> _wrapperTypes;
+		delegate IntPtr GetNativeClassFunc (out bool is_custom_type);
+
+		private Dictionary<RuntimeTypeHandle, GetNativeClassFunc> _getNativeClasses;
+		private Dictionary<RuntimeTypeHandle, Func<NativeHandle, NSObject>> _createNSObjects;
+		private Dictionary<RuntimeTypeHandle, Func<NativeHandle, bool, INativeObject>> _createINativeObjects;
+		private Dictionary<RuntimeTypeHandle, RuntimeTypeHandle> _protocolWrapperTypes;
 
 		internal ManagedRegistrar (RuntimeTypeHandleEqualityComparer runtimeTypeHandleEqualityComparer)
 		{
-			_getObjCClasses = new (runtimeTypeHandleEqualityComparer);
-			_nsObjectFactories = new (runtimeTypeHandleEqualityComparer);
-			_nativeObjectFactories = new (runtimeTypeHandleEqualityComparer);
-			_wrapperTypes = new (runtimeTypeHandleEqualityComparer);
+			_getNativeClasses = new (runtimeTypeHandleEqualityComparer);
+			_createNSObjects = new (runtimeTypeHandleEqualityComparer);
+			_createINativeObjects = new (runtimeTypeHandleEqualityComparer);
+			_protocolWrapperTypes = new (runtimeTypeHandleEqualityComparer);
 		}
 
-		public static void Register<T> ()
+		internal void Register<T> ()
 			where T : IManagedRegistrarType
 		{
-			if (!Runtime.IsManagedStaticRegistrar) {
-				throw new InvalidOperationException ($"Cannot register type '{typeof (T)}' when the managed static registrar is not used.");
+			var type = typeof (T);
+			var handle = type.TypeHandle;
+
+			// types that are generic but don't have any generic type arguments cannot be registered
+			// this is a bug that the developer must fix
+			if (type.IsGenericType && type == type.GetGenericTypeDefinition ()) {
+				throw new InvalidOperationException (
+					$"Cannot register a generic type {type} without generic type arguments.");
 			}
 
-			RegistrarHelper.RegisterManagedRegistrarType<T> ();
-		}
-
-		internal static void ThrowWhenUsingManagedStaticRegistrar ([CallerMemberName] string? caller = null)
-		{
-			if (Runtime.IsManagedStaticRegistrar)
-				throw new UnreachableException (
-					$"The method '{caller ?? "<unknown>"}' cannot be called when using the managed static registrar.");
-		}
-
-		internal void AddType<T> ()
-			where T : IManagedRegistrarType
-		{
-			// TODO lock-free synchronization using SemaphoreSlim?
-			var type = typeof (T);
-
-			// types that are generic but don't have any generic type arguments cannot be instantiated
-			if (!type.IsGenericType || type != type.GetGenericTypeDefinition ()) {
-				_nsObjectFactories.Add (type.TypeHandle, T.CreateNSObject);
-				_nativeObjectFactories.Add (type.TypeHandle, T.CreateINativeObject);
-				_getObjCClasses.Add (type.TypeHandle, T.GetObjCClass);
-			} else {
-				Console.WriteLine ($"Registered a generic type {type} without any generic type arguments.");
+			_semaphore.Wait ();
+#if TRACE
+			Runtime.NSLog ($"ManagedRegistrar: Registering {type}");
+#endif
+			try {
+				_createNSObjects.Add (handle, T.CreateNSObject);
+				_createINativeObjects.Add (handle, T.CreateINativeObject);
+				_getNativeClasses.Add (handle, T.GetNativeClass);
+				// TODO protocol wrapper types
+			} finally {
+				_semaphore.Release ();
 			}
 		}
 
@@ -93,7 +82,7 @@ namespace ObjCRuntime {
 			is_custom_type = false;
 			EnsureClassConstructorHasRun (type.TypeHandle);
 
-			if (_getObjCClasses.TryGetValue (type.TypeHandle, out var getObjCClass))
+			if (_getNativeClasses.TryGetValue (type.TypeHandle, out var getObjCClass))
 				return getObjCClass (out is_custom_type);
 
 			ThrowIfGenericType (type);
@@ -103,15 +92,21 @@ namespace ObjCRuntime {
 		internal static Type? FindType (NativeHandle @class, out bool is_custom_type)
 		{
 			is_custom_type = false;
+
 			var ptr = IntPtr_objc_msgSend_ref_bool (@class, Selector.GetHandle ("getDotnetType:"), ref is_custom_type);
+			if (ptr == IntPtr.Zero)
+				return null;
+
 			return GCHandle.FromIntPtr (ptr).Target as Type;
 		}
 
 		internal NSObject? CreateNSObject(RuntimeTypeHandle runtimeTypeHandle, NativeHandle handle)
 		{
 			EnsureClassConstructorHasRun (runtimeTypeHandle);
-
-			if (_nsObjectFactories.TryGetValue (runtimeTypeHandle, out var factory))
+#if TRACE
+			Runtime.NSLog ($"ManagedRegistrar: CreateNSObject(type: {Type.GetTypeFromHandle (runtimeTypeHandle)}, handle: {handle})");
+#endif
+			if (_createNSObjects.TryGetValue (runtimeTypeHandle, out var factory))
 				return factory (handle);
 
 			ThrowIfGenericType (runtimeTypeHandle);
@@ -121,8 +116,10 @@ namespace ObjCRuntime {
 		internal INativeObject? CreateINativeObject (RuntimeTypeHandle runtimeTypeHandle, NativeHandle handle, bool owns)
 		{
 			EnsureClassConstructorHasRun (runtimeTypeHandle);
-
-			if (_nativeObjectFactories.TryGetValue (runtimeTypeHandle, out var factory))
+#if TRACE
+			Runtime.NSLog ($"ManagedRegistrar: CreateINativeObject(type: {Type.GetTypeFromHandle (runtimeTypeHandle)}, handle: {handle}, owns: {owns})");
+#endif
+			if (_createINativeObjects.TryGetValue (runtimeTypeHandle, out var factory))
 				return factory (handle, owns);
 
 			ThrowIfGenericType (runtimeTypeHandle);
@@ -132,8 +129,10 @@ namespace ObjCRuntime {
 		internal bool RegisterWrapperType(RuntimeTypeHandle runtimeTypeHandle, Dictionary<RuntimeTypeHandle, RuntimeTypeHandle> wrapperTypes)
 		{
 			EnsureClassConstructorHasRun(runtimeTypeHandle);
-
-			if (_wrapperTypes.TryGetValue(runtimeTypeHandle, out var wrapperType))
+#if TRACE
+			Runtime.NSLog ($"ManagedRegistrar: RegisterWrapperType(type: {Type.GetTypeFromHandle (runtimeTypeHandle)})");
+#endif
+			if (_protocolWrapperTypes.TryGetValue(runtimeTypeHandle, out var wrapperType))
 			{
 				// it shouldn't be there but there's no reason to throw if it's already there (race condition?)
 				_ = wrapperTypes.TryAdd(runtimeTypeHandle, wrapperType);
@@ -169,8 +168,7 @@ namespace ObjCRuntime {
 			}
 		}
 
-		// TODO: is this necessary in our use case? it seems it's only used in debug mode with dynamic linking?
-		// Should we register all the entrypoints with the type in the static constructor?
+		// TODO: this is necessary whenever we don't statically link the final app (e.g., in debug mode)
 		internal IntPtr LookupUnmanagedFunction(string? entryPoint, int id) => (IntPtr)(-1);
 
 		[DllImport ("/usr/lib/libobjc.dylib", EntryPoint = "objc_msgSend")]

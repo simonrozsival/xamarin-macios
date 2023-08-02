@@ -5,7 +5,7 @@
 // Copyright 2011 - 2015 Xamarin Inc. All rights reserved.
 //
 
-//#define LOG_TYPELOAD
+#define LOG_TYPELOAD
 
 #nullable enable
 
@@ -49,7 +49,10 @@ namespace ObjCRuntime {
 		internal unsafe static void Initialize (Runtime.InitializationOptions* options)
 		{
 			type_to_class = new Dictionary<Type, IntPtr> (Runtime.TypeEqualityComparer);
-
+#if NET
+			if (Runtime.IsManagedStaticRegistrar)
+				return;
+#endif
 			var map = options->RegistrationMap;
 			if (map is null)
 				return;
@@ -234,6 +237,8 @@ namespace ObjCRuntime {
 
 		internal static IntPtr Register (Type type)
 		{
+			Runtime.ThrowIfManagedStaticRegistrar ();
+
 			return Runtime.Registrar.Register (type);
 		}
 
@@ -242,7 +247,11 @@ namespace ObjCRuntime {
 		{
 #if NET
 			if (Runtime.IsManagedStaticRegistrar) {
-				return RegistrarHelper.FindClass (type, out is_custom_type);
+				var rv = RegistrarHelper.FindClass (type, out is_custom_type);
+#if LOG_TYPELOAD
+				Runtime.NSLog ($"FindClass ({type.FullName}, {is_custom_type}): 0x{rv.ToString ("x")} = {Marshal.PtrToStringAuto (class_getName (rv))}.");
+#endif
+				return rv;
 			}
 #endif
 
@@ -334,6 +343,8 @@ namespace ObjCRuntime {
 
 		internal static unsafe int FindMapIndex (Runtime.MTClassMap* array, int lo, int hi, IntPtr @class)
 		{
+			Runtime.ThrowIfManagedStaticRegistrar ();
+
 			if (hi >= lo) {
 				int mid = lo + (hi - lo) / 2;
 				IntPtr handle = array [mid].handle;
@@ -354,14 +365,18 @@ namespace ObjCRuntime {
 		{
 #if NET
 			if (Runtime.IsManagedStaticRegistrar) {
-				return ManagedRegistrar.FindType (@class, out is_custom_type);
+				var rv = RegistrarHelper.FindType (@class, out is_custom_type);
+#if LOG_TYPELOAD
+				Runtime.NSLog ($"FindType ({@class:X} = {Marshal.PtrToStringAuto (class_getName (@class))}) => {rv?.FullName}; is custom: {is_custom_type}.");
+#endif
+				return rv;
 			}
 #endif
 			
 			var map = Runtime.options->RegistrationMap;
 
 #if LOG_TYPELOAD
-			Runtime.NSLog ($"FindType (0x{@class:X} = {Marshal.PtrToStringAuto (class_getName (@class))})");
+				Runtime.NSLog ($"FindType (0x{@class:X} = {Marshal.PtrToStringAuto (class_getName (@class))})");
 #endif
 
 			is_custom_type = false;
@@ -410,6 +425,8 @@ namespace ObjCRuntime {
 
 		internal unsafe static MemberInfo? ResolveFullTokenReference (uint token_reference)
 		{
+			Runtime.ThrowIfManagedStaticRegistrar ();
+
 			// sizeof (MTFullTokenReference) = IntPtr.Size + 4 + 4
 			var idx = (int) (token_reference >> 1);
 			var entry = Runtime.options->RegistrationMap->full_token_references [idx];
@@ -428,6 +445,8 @@ namespace ObjCRuntime {
 
 		internal static Type? ResolveTypeTokenReference (uint token_reference)
 		{
+			Runtime.ThrowIfManagedStaticRegistrar ();
+
 			var member = ResolveTokenReference (token_reference, 0x02000000 /* TypeDef */);
 			if (member is null)
 				return null;
@@ -439,6 +458,8 @@ namespace ObjCRuntime {
 
 		internal static MethodBase? ResolveMethodTokenReference (uint token_reference)
 		{
+			Runtime.ThrowIfManagedStaticRegistrar ();
+
 			var member = ResolveTokenReference (token_reference, 0x06000000 /* Method */);
 			if (member is null)
 				return null;
@@ -471,10 +492,6 @@ namespace ObjCRuntime {
 
 		static MemberInfo? ResolveToken (Assembly assembly, Module? module, uint token)
 		{
-#if NET
-			ManagedRegistrar.ThrowWhenUsingManagedStaticRegistrar ();
-#endif
-
 			// Finally resolve the token.
 			var token_type = token & 0xFF000000;
 			switch (token & 0xFF000000) {
@@ -599,9 +616,7 @@ namespace ObjCRuntime {
 
 		internal unsafe static uint GetTokenReference (Type type, bool throw_exception = true)
 		{
-#if NET
-			ManagedRegistrar.ThrowWhenUsingManagedStaticRegistrar ();
-#endif
+			Runtime.ThrowIfManagedStaticRegistrar ();
 
 			if (type.IsGenericType)
 				type = type.GetGenericTypeDefinition ();

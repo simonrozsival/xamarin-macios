@@ -7,7 +7,8 @@
 // Copyright 2023 Microsoft Corp
 
 
-// #define TRACE
+#define TRACE
+
 #if NET
 
 #nullable enable
@@ -83,10 +84,6 @@ namespace ObjCRuntime {
 
 		static IntPtr GetBlockForDelegate (object @delegate, RuntimeMethodHandle method_handle)
 		{
-#if NET
-			ManagedRegistrar.ThrowWhenUsingManagedStaticRegistrar ();
-#endif
-
 			var method = (MethodInfo) MethodBase.GetMethodFromHandle (method_handle)!;
 			return BlockLiteral.GetBlockForDelegate (method, @delegate, Runtime.INVALID_TOKEN_REF, null);
 		}
@@ -114,11 +111,15 @@ namespace ObjCRuntime {
 			return null;
 		}
 
-		internal static void RegisterManagedRegistrarType<T> ()
+		public static void Register<T> ()
 			where T : IManagedRegistrarType
 		{
+			if (!Runtime.IsManagedStaticRegistrar) {
+				throw new InvalidOperationException ($"Cannot register type '{typeof (T)}' when the managed static registrar is not used.");
+			}
+
 			var map = GetOrInitMapInfo (typeof (T).Assembly);
-			map.Registrar.AddType<T> ();
+			map.Registrar.Register<T> ();
 		}
 
 #if TRACE
@@ -162,10 +163,15 @@ namespace ObjCRuntime {
 			return IntPtr.Zero;
 		}
 
-		internal static IntPtr FindClass (Type type, out bool is_custom_type)
+		internal static IntPtr FindClass (Type type, out bool isCustomType)
 		{
 			var map = GetOrInitMapInfo (type.Assembly);
-			return map.Registrar.FindClass (type, out is_custom_type);
+			return map.Registrar.FindClass (type, out isCustomType);
+		}
+
+		internal static Type? FindType (NativeHandle @class, out bool isCustomType)
+		{
+			return ManagedRegistrar.FindType (@class, out isCustomType);
 		}
 
 		internal static T? ConstructNSObject<T> (IntPtr ptr, Type type)
@@ -181,7 +187,7 @@ namespace ObjCRuntime {
 			var map = GetOrInitMapInfo (type.Assembly);
 			return (T?)map.Registrar.CreateINativeObject (type.TypeHandle, ptr, owns);
 		}
-		
+
 		static MapInfo GetOrInitMapInfo (Assembly assembly)
 		{
 			var assemblyName = assembly.FullName!;
@@ -379,6 +385,19 @@ namespace ObjCRuntime {
 			Runtime.NSLog ($"INativeObject_managed_to_native (0x{(*ptr).ToString ("x")}, ? != ?): 0x{rv.ToString ("x")} => {value?.GetType ()}");
 #endif
 			*ptr = rv;
+		}
+
+		public unsafe static IntPtr GetDotnetType<T> (IntPtr* exception_gchandle) {
+			try {
+				var rv = Runtime.AllocGCHandle (typeof (T));
+#if TRACE
+				Runtime.NSLog ($"GetDotnetType: {typeof (T)} (GC handle: 0x{rv:x})");
+#endif
+				return rv;
+			} catch (Exception ex) {
+				*exception_gchandle = Runtime.AllocGCHandle(ex);
+				return IntPtr.Zero;
+			}
 		}
 	}
 }

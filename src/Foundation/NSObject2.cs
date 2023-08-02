@@ -220,15 +220,6 @@ namespace Foundation {
 			InitializeObject (alloced);
 		}
 
-		// TODO do something more clever here (get rid of _x)
-		protected NSObject (NativeHandle handle, int _x)
-		{
-			this.handle = handle;
-			this.flags = Flags.NativeRef;
-			bool alloced = AllocIfNeeded ();
-			InitializeObject (alloced);
-		}
-
 		~NSObject ()
 		{
 			Dispose (false);

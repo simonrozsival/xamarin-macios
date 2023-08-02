@@ -3148,9 +3148,7 @@ namespace Registrar {
 					}
 				}
 
-				// TODO extend the interface here
 				iface.WriteLine ($"+(void*) getDotnetType: (BOOL*) is_custom_type;");
-				// iface.WriteLine ($"-(void*) createDotnetInstance;");
 
 				iface.Unindent ();
 				iface.WriteLine ("@end");
@@ -3191,11 +3189,11 @@ namespace Registrar {
 					}
 
 					// +(void*) getDotnetType;
-					sb.WriteLine($"void* callback_{class_name}_GetDotnetType (id self, SEL _cmd, GCHandle* exception_gchandle);");
-					sb.WriteLine("+(void*) getDotnetType: (BOOL*) is_custom_type; {");
+					sb.WriteLine($"void* callback_{class_name}_GetDotnetType (GCHandle* exception_gchandle);");
+					sb.WriteLine("+(void*) getDotnetType: (BOOL*) is_custom_type {");
 					sb.WriteLine("*is_custom_type = YES;");
 					sb.WriteLine("GCHandle exception_gchandle = INVALID_GCHANDLE;");
-					sb.WriteLine($"void* rv = callback_{class_name}_GetDotnetType (self, _cmd, &exception_gchandle);");
+					sb.WriteLine($"void* rv = callback_{class_name}_GetDotnetType (&exception_gchandle);");
 					sb.WriteLine("xamarin_process_managed_exception_gchandle (exception_gchandle);");
 					sb.WriteLine("return rv;");
 					sb.WriteLine("}");
@@ -5607,14 +5605,18 @@ namespace Registrar {
 
 			foreach (var (className, callback) in categoriesToGenerate) {
 				methods.AppendLine ($"@interface {className} ({className}Category)");
+				// methods.AppendLine ("-(void*) getDotnetType: (BOOL*) is_custom_type;");
 				methods.AppendLine ("+(void*) getDotnetType: (BOOL*) is_custom_type;");
 				methods.AppendLine ("@end");
 				methods.AppendLine ($"@implementation {className} ({className}Category)");
-				methods.AppendLine ($"void* {callback} (id self, SEL sel, GCHandle* exception_gchandle);");
+				methods.AppendLine ($"void* {callback} (GCHandle* exception_gchandle);");
+				// methods.AppendLine ("-(void*) getDotnetType: (BOOL*) is_custom_type {");
+				// methods.AppendLine ($"return [{className} getDotnetType: is_custom_type]");
+				// methods.AppendLine ("}");
 				methods.AppendLine ("+(void*) getDotnetType: (BOOL*) is_custom_type {");
 				methods.AppendLine ("*is_custom_type = NO;");
 				methods.AppendLine ("GCHandle exception_gchandle = INVALID_GCHANDLE;");
-				methods.AppendLine ($"void* rv = {callback} (self, _cmd, &exception_gchandle);");
+				methods.AppendLine ($"void* rv = {callback} (&exception_gchandle);");
 				methods.AppendLine ("xamarin_process_managed_exception_gchandle (exception_gchandle);");
 				methods.AppendLine ("return rv;");
 				methods.AppendLine ("}");
@@ -5649,14 +5651,14 @@ namespace Registrar {
 
 			header.StringBuilder.AppendLine ("extern \"C\" {");
 
-			foreach (var (className, serializedDotnetClassName, isCustomType) in typesToClasses) {
-				methods.AppendLine ($"void* get_objc_class_{serializedDotnetClassName} (BOOL* is_custom_type) {{");
+			foreach (var (className, dotnetClassName, isCustomType) in typesToClasses) {
+				methods.AppendLine ($"void* get_objc_class_{dotnetClassName} (BOOL* is_custom_type) {{");
 				var yes_no = isCustomType ? "YES" : "NO";
 				methods.AppendLine ($"*is_custom_type = {yes_no};");
 				methods.AppendLine ($"return [{className} class];");
 				methods.AppendLine ("}");
 
-				header.AppendLine ($"void* get_objc_class_{serializedDotnetClassName} (BOOL* is_custom_type);");
+				header.AppendLine ($"void* get_objc_class_{dotnetClassName} (BOOL* is_custom_type);");
 			}
 
 			header.StringBuilder.AppendLine ("} /* extern \"C\" */");
