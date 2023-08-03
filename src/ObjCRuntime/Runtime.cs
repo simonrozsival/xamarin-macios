@@ -236,8 +236,7 @@ namespace ObjCRuntime {
 		{
 #if NET
 			if (Runtime.IsManagedStaticRegistrar)
-				throw new UnreachableException (
-					$"The method '{caller ?? "<unknown>"}' cannot be called when using the managed static registrar.");
+				throw new UnreachableException ($"The method '{caller ?? "<unknown>"}' cannot be called when using the managed static registrar.");
 #endif
 		}
 
@@ -1566,8 +1565,6 @@ namespace ObjCRuntime {
 
 		internal static NSObject? GetNSObject (IntPtr ptr, MissingCtorResolution missingCtorResolution, bool evenInFinalizerQueue = false)
 		{
-			Console.WriteLine ($"GetNSObject (ptr: 0x{ptr:x2})");
-
 			if (ptr == IntPtr.Zero)
 				return null;
 

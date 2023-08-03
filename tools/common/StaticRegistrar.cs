@@ -3148,7 +3148,7 @@ namespace Registrar {
 					}
 				}
 
-				iface.WriteLine ($"+(void*) getDotnetType: (BOOL*) is_custom_type;");
+				iface.WriteLine ($"+(void*) getDotnetType;");
 
 				iface.Unindent ();
 				iface.WriteLine ("@end");
@@ -3190,8 +3190,7 @@ namespace Registrar {
 
 					// +(void*) getDotnetType;
 					sb.WriteLine($"void* callback_{class_name}_GetDotnetType (GCHandle* exception_gchandle);");
-					sb.WriteLine("+(void*) getDotnetType: (BOOL*) is_custom_type {");
-					sb.WriteLine("*is_custom_type = YES;");
+					sb.WriteLine("+(void*) getDotnetType {");
 					sb.WriteLine("GCHandle exception_gchandle = INVALID_GCHANDLE;");
 					sb.WriteLine($"void* rv = callback_{class_name}_GetDotnetType (&exception_gchandle);");
 					sb.WriteLine("xamarin_process_managed_exception_gchandle (exception_gchandle);");
@@ -5601,20 +5600,21 @@ namespace Registrar {
 				("NSRunLoop", "callback_Foundation_NSRunLoop_GetDotnetType"),
 				("NSAutoreleasePool", "callback_Foundation_NSAutoreleasePool_GetDotnetType"),
 				("NSDictionary", "callback_Foundation_NSDictionary_GetDotnetType"),
+				("NSString", "callback_Foundation_NSString_GetDotnetType"),
+				("NSNumber", "callback_Foundation_NSNumber_GetDotnetType"),
+				("NSArray", "callback_Foundation_NSArray_GetDotnetType"),
+				("NSNull", "callback_Foundation_NSNull_GetDotnetType"),
+				// ("CGPath", "callback_CoreGraphics_CGPath_GetDotnetType"), // TODO CGPath is a C struct and I can't add a category for it...
 			};
 
 			foreach (var (className, callback) in categoriesToGenerate) {
 				methods.AppendLine ($"@interface {className} ({className}Category)");
-				// methods.AppendLine ("-(void*) getDotnetType: (BOOL*) is_custom_type;");
-				methods.AppendLine ("+(void*) getDotnetType: (BOOL*) is_custom_type;");
+				// methods.AppendLine ("-(void*) getDotnetType;");
+				methods.AppendLine ("+(void*) getDotnetType;");
 				methods.AppendLine ("@end");
 				methods.AppendLine ($"@implementation {className} ({className}Category)");
 				methods.AppendLine ($"void* {callback} (GCHandle* exception_gchandle);");
-				// methods.AppendLine ("-(void*) getDotnetType: (BOOL*) is_custom_type {");
-				// methods.AppendLine ($"return [{className} getDotnetType: is_custom_type]");
-				// methods.AppendLine ("}");
-				methods.AppendLine ("+(void*) getDotnetType: (BOOL*) is_custom_type {");
-				methods.AppendLine ("*is_custom_type = NO;");
+				methods.AppendLine ("+(void*) getDotnetType {");
 				methods.AppendLine ("GCHandle exception_gchandle = INVALID_GCHANDLE;");
 				methods.AppendLine ($"void* rv = {callback} (&exception_gchandle);");
 				methods.AppendLine ("xamarin_process_managed_exception_gchandle (exception_gchandle);");
@@ -5623,45 +5623,38 @@ namespace Registrar {
 				methods.AppendLine ("@end");
 			}
 
-			// the pinvokes for getting the class for managed type
-			var typesToClasses = new List<(string, string, bool)>
-			{
-				("MySingleView_AppDelegate", "MySingleView_AppDelegate", true),
-				// ("MySingleView_CustomGenericNSObject_2", "MySingleView_CustomGenericNSObject_2", true),
-				("Microsoft_MacCatalyst__UIKit_UIApplicationDelegate", "Microsoft_MacCatalyst__UIKit_UIApplicationDelegate", true),
-				("NSException", "Foundation_NSException", false),
-				("UIApplication", "UIKit_UIApplication", false),
-				("UIResponder", "UIKit_UIResponder", false),
-				("UIViewController", "UIKit_UIViewController", false),
-				("UIView", "UIKit_UIView", false),
-				("UIControl", "UIKit_UIControl", false),
-				("UIButton", "UIKit_UIButton", false),
-				("UIScreen", "UIKit_UIScreen", false),
-				("UIWindow", "UIKit_UIWindow", false),
-				("NSRunLoop", "Foundation_NSRunLoop", false),
-				("NSAutoreleasePool", "Foundation_NSAutoreleasePool", false),
-				("NSDictionary", "Foundation_NSDictionary", false),
-				("Foundation_NSDispatcher", "Foundation_NSDispatcher", true),
-				("__MonoMac_NSSynchronizationContextDispatcher", "Foundation_NSSynchronizationContextDispatcher", true),
-				("Foundation_NSAsyncDispatcher", "Foundation_NSAsyncDispatcher", true),
-				("__MonoMac_NSAsyncSynchronizationContextDispatcher", "Foundation_NSAsyncSynchronizationContextDispatcher", true),
-				("__NSObject_Disposer", "Foundation_NSObject_Disposer", true),
-				("UIKit_UIControlEventProxy", "UIKit_UIControlEventProxy", true),
-			};
+			// // the pinvokes for getting the class for managed type
+			// var typesToClasses = new List<(string, string, bool)>
+			// {
+			// 	("MySingleView_AppDelegate", "MySingleView_AppDelegate", true),
+			// 	("RegistrarTestClass", "MySingleView_RegistrarTestClass", true),
+			// 	// ("MySingleView_CustomGenericNSObject_2", "MySingleView_CustomGenericNSObject_2", true),
+			// 	("Microsoft_MacCatalyst__UIKit_UIApplicationDelegate", "Microsoft_MacCatalyst__UIKit_UIApplicationDelegate", true),
+			// 	("NSException", "Foundation_NSException", false),
+			// 	("UIApplication", "UIKit_UIApplication", false),
+			// 	("UIResponder", "UIKit_UIResponder", false),
+			// 	("UIViewController", "UIKit_UIViewController", false),
+			// 	("UIView", "UIKit_UIView", false),
+			// 	("UIControl", "UIKit_UIControl", false),
+			// 	("UIButton", "UIKit_UIButton", false),
+			// 	("UIScreen", "UIKit_UIScreen", false),
+			// 	("UIWindow", "UIKit_UIWindow", false),
+			// 	("NSArray", "Foundation_NSArray_1", false),
+			// 	("NSString", "Foundation_NSString", false),
+			// 	("NSNumber", "Foundation_NSNumber", false),
+			// 	("NSRunLoop", "Foundation_NSRunLoop", false),
+			// 	("NSAutoreleasePool", "Foundation_NSAutoreleasePool", false),
+			// 	("NSDictionary", "Foundation_NSDictionary", false),
+			// 	("Foundation_NSDispatcher", "Foundation_NSDispatcher", true),
+			// 	("__MonoMac_NSSynchronizationContextDispatcher", "Foundation_NSSynchronizationContextDispatcher", true),
+			// 	("Foundation_NSAsyncDispatcher", "Foundation_NSAsyncDispatcher", true),
+			// 	("__MonoMac_NSAsyncSynchronizationContextDispatcher", "Foundation_NSAsyncSynchronizationContextDispatcher", true),
+			// 	("__NSObject_Disposer", "Foundation_NSObject_Disposer", true),
+			// 	("UIKit_UIControlEventProxy", "UIKit_UIControlEventProxy", true),
+			// 	("NSNull", "Foundation_NSNull", false),
+			// 	// ("CGPath", "CoreGraphics_CGPath", false),
+			// };
 
-			header.StringBuilder.AppendLine ("extern \"C\" {");
-
-			foreach (var (className, dotnetClassName, isCustomType) in typesToClasses) {
-				methods.AppendLine ($"void* get_objc_class_{dotnetClassName} (BOOL* is_custom_type) {{");
-				var yes_no = isCustomType ? "YES" : "NO";
-				methods.AppendLine ($"*is_custom_type = {yes_no};");
-				methods.AppendLine ($"return [{className} class];");
-				methods.AppendLine ("}");
-
-				header.AppendLine ($"void* get_objc_class_{dotnetClassName} (BOOL* is_custom_type);");
-			}
-
-			header.StringBuilder.AppendLine ("} /* extern \"C\" */");
 			methods.StringBuilder.AppendLine ("} /* extern \"C\" */");
 
 			FlushTrace ();

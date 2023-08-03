@@ -27,6 +27,8 @@ namespace MySingleView
 		// }
 
 		static AppDelegate () => RegistrarHelper.Register<AppDelegate> ();
+		public static new bool IsCustomType => true;
+		public static new NativeHandle GetNativeClass () => Class.GetHandle ("MySingleView_AppDelegate");
 		public static new Foundation.NSObject CreateNSObject (NativeHandle handle) => new AppDelegate (handle);
 
 		// TODO: doesn't work with base classes that don't have _shadow_ constructors
@@ -40,11 +42,6 @@ namespace MySingleView
 		protected internal AppDelegate (NativeHandle handle) : base (handle)
 		{
 		}
-
-		public static new IntPtr GetNativeClass (out bool is_custom_type) => get_objc_class_MySingleView_AppDelegate (out is_custom_type);
-
-		[DllImport("__Internal")]
-		private static extern IntPtr get_objc_class_MySingleView_AppDelegate (out bool is_custom_type);
 	}
 
 	// partial class CustomGenericNSObject<T1, T2> : ObjCRuntime.IManagedRegistrarType
@@ -55,20 +52,481 @@ namespace MySingleView
 	// 		return new CustomGenericNSObject<T1, T2> (handle);
 	// 	}
 
-	// 	public static IntPtr GetNativeClass (out bool is_custom_type) => get_objc_class_MySingleView_CustomGenericNSObject_2 (out is_custom_type);
-
-	// 	[DllImport("__Internal")]
-	// 	private static extern IntPtr get_objc_class_MySingleView_CustomGenericNSObject_2 (out bool is_custom_type);
+	// 	public static NativeHandle GetNativeClass () => Class.GetHandle("MySingleView_CustomGenericNSObject");
 	// }
 
-	interface IGetDotnetType {
-		Type GetDotnetType ();
-	}
+	// interface IGetDotnetType {
+	// 	Type GetDotnetType ();
+	// }
 
 	// partial class CustomGenericNSObject<T1, T2> : IGetDotnetType
 	// {
 	// 	public Type GetDotnetType () => typeof (CustomGenericNSObject<T1, T2>);
 	// }
+	
+	partial class RegistrarTestClass : IManagedRegistrarType {
+		static RegistrarTestClass () => RegistrarHelper.Register<RegistrarTestClass> ();
+		public static bool IsCustomType => true;
+		public static Foundation.NSObject CreateNSObject (NativeHandle handle) => new RegistrarTestClass (handle);
+		public RegistrarTestClass () : base () {}
+		protected internal RegistrarTestClass (NativeHandle handle) : base (handle) {}
+		public static NativeHandle GetNativeClass () => Class.GetHandle ("RegistrarTestClass");
+
+		public static class __Registrar_Callbacks__
+		{
+			// [UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_FinishedLaunching")]
+			// public unsafe static byte callback_MySingleView_RegistrarTestClass_FinishedLaunching(IntPtr pobj, IntPtr sel, IntPtr p0, IntPtr p1, IntPtr* exception_gchandle)
+			// {
+			// 	try {
+			// 		var nSObject = Runtime.GetNSObject<MySingleView.AppDelegate>(pobj, sel, method_handle: default, evenInFinalizerQueue: true)!;
+			// 		var nSObject2 = Runtime.GetNSObject<UIKit.UIApplication>(p0, sel, method_handle: default, evenInFinalizerQueue: false)!;
+			// 		var nSObject3 = Runtime.GetNSObject<Foundation.NSDictionary>(p1, sel, method_handle: default, evenInFinalizerQueue: false)!;
+			// 		return nSObject.FinishedLaunching(nSObject2, nSObject3) ? ((byte)1) : ((byte)0);
+			// 	} catch (Exception ex) {
+			// 		*exception_gchandle = Runtime.AllocGCHandle(ex);
+			// 	}
+			// 	return default(byte);
+			// }
+
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_FetchComplexGenericType")]
+			public static unsafe IntPtr callback_MySingleView_RegistrarTestClass_FetchComplexGenericType(IntPtr pobj, IntPtr sel, IntPtr p0, IntPtr* exception_gchandle)
+			{
+				try {
+					var nSObject = Runtime.GetNSObject<MySingleView.RegistrarTestClass>(pobj, sel, method_handle: default, evenInFinalizerQueue: true)!;
+					var nSObject2 = Runtime.GetNSObject<Foundation.NSArray<Foundation.NSDictionary<Foundation.NSString, Foundation.NSArray<Foundation.NSNumber>>>> (p0, sel, method_handle: default, evenInFinalizerQueue: false)!;
+					return nSObject.FetchComplexGenericType(nSObject2).Handle;
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+					return default;
+				}
+			}
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_FetchNSArrayOfNSString")]
+			public static unsafe IntPtr callback_MySingleView_RegistrarTestClass_FetchNSArrayOfNSString(IntPtr pobj, IntPtr sel, IntPtr p0, IntPtr* exception_gchandle)
+			{
+				try {
+					var nSObject = Runtime.GetNSObject<MySingleView.RegistrarTestClass>(pobj, sel, method_handle: default, evenInFinalizerQueue: true)!;
+					var nSObject2 = Runtime.GetNSObject<Foundation.NSArray<Foundation.NSNumber>> (p0, sel, method_handle: default, evenInFinalizerQueue: false)!;
+					// var arr = Foundation.NSArray.ArrayFromHandle<Foundation.NSNumber> (p0);
+					// var nSObject2 = arr is not null ? Foundation.NSArray<Foundation.NSNumber>.FromNSObjects (arr) : null;
+					// var nSObject2 = arr is not null ? Foundation.NSArray<Foundation.NSNumber>.FromNSObjects (arr) : null;
+					// return Runtime.AllocGCHandle (nSObject.FetchNSArrayOfNSString(nSObject2));
+					return nSObject.FetchNSArrayOfNSString(nSObject2).Handle; // ???!!
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+					return IntPtr.Zero;
+				}
+			}
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_INativeObject1")]
+			public static unsafe byte callback_MySingleView_RegistrarTestClass_INativeObject1(IntPtr ptr, IntPtr sel, IntPtr p0, IntPtr* exception_gchandle)
+			{
+				try {
+					var o0 = Runtime.GetINativeObject<CoreGraphics.CGPath> (p0, false);
+					return MySingleView.RegistrarTestClass.INativeObject1 (o0) ? (byte)1 : (byte)0;
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+					return default;
+				}
+			}
+
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_INativeObject2")]
+			public static unsafe IntPtr callback_MySingleView_RegistrarTestClass_INativeObject2(IntPtr ptr, IntPtr sel, byte p0, IntPtr* exception_gchandle)
+			{
+				try {
+					return MySingleView.RegistrarTestClass.INativeObject2 (p0 == (byte)1)?.Handle ?? IntPtr.Zero;
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+					return default;
+				}
+			}
+
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_INativeObject3")]
+			public static unsafe void callback_MySingleView_RegistrarTestClass_INativeObject3(IntPtr ptr, IntPtr sel, IntPtr* exception_gchandle)
+			{
+				try {
+					
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+				}
+			}
+
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_INativeObject4")]
+			public static unsafe byte callback_MySingleView_RegistrarTestClass_INativeObject4(IntPtr ptr, IntPtr sel, IntPtr* p0, IntPtr* exception_gchandle)
+			{
+				try {
+					var o0 = Runtime.GetINativeObject<CoreGraphics.CGPath> (*p0, false);
+					var rv = MySingleView.RegistrarTestClass.INativeObject4 (ref o0);
+					*p0 = o0?.Handle ?? IntPtr.Zero;
+					return rv ? (byte)1 : (byte)0;
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+					return default;
+				}
+			}
+
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_INativeObject5")]
+			public static unsafe IntPtr callback_MySingleView_RegistrarTestClass_INativeObject5(IntPtr ptr, IntPtr sel, byte p0, IntPtr* exception_gchandle)
+			{
+				try {
+					return MySingleView.RegistrarTestClass.INativeObject5 (p0 == (byte)1)?.Handle ?? IntPtr.Zero;
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+					return default;
+				}
+			}
+
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_TestBug23289")]
+			public static unsafe void callback_MySingleView_RegistrarTestClass_TestBug23289(IntPtr ptr, IntPtr sel, IntPtr* exception_gchandle)
+			{
+				try {
+					
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+				}
+			}
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_TestCGPoint")]
+			public static unsafe void callback_MySingleView_RegistrarTestClass_TestCGPoint(IntPtr ptr, IntPtr sel, IntPtr* exception_gchandle)
+			{
+				try {
+					
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+				}
+			}
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_TestNSAction")]
+			public static unsafe void callback_MySingleView_RegistrarTestClass_TestNSAction(IntPtr ptr, IntPtr sel, IntPtr* exception_gchandle)
+			{
+				try {
+					
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+				}
+			}
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_TestNativeEnum1")]
+			public static unsafe void callback_MySingleView_RegistrarTestClass_TestNativeEnum1(IntPtr ptr, IntPtr sel, IntPtr* exception_gchandle)
+			{
+				try {
+					
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+				}
+			}
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_TestOutNSString")]
+			public static unsafe void callback_MySingleView_RegistrarTestClass_TestOutNSString(IntPtr ptr, IntPtr sel, IntPtr* exception_gchandle)
+			{
+				try {
+					
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+				}
+			}
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_TestOutParameters")]
+			public static unsafe void callback_MySingleView_RegistrarTestClass_TestOutParameters(IntPtr ptr, IntPtr sel, IntPtr* exception_gchandle)
+			{
+				try {
+					
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+				}
+			}
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_TestOverriddenRetainNSObject")]
+			public static unsafe void callback_MySingleView_RegistrarTestClass_TestOverriddenRetainNSObject(IntPtr ptr, IntPtr sel, IntPtr* exception_gchandle)
+			{
+				try {
+					
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+				}
+			}
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_TestRetainArray")]
+			public static unsafe void callback_MySingleView_RegistrarTestClass_TestRetainArray(IntPtr ptr, IntPtr sel, IntPtr* exception_gchandle)
+			{
+				try {
+					
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+				}
+			}
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_TestRetainINativeObject")]
+			public static unsafe void callback_MySingleView_RegistrarTestClass_TestRetainINativeObject(IntPtr ptr, IntPtr sel, IntPtr* exception_gchandle)
+			{
+				try {
+					
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+				}
+			}
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_TestRetainNSObject")]
+			public static unsafe void callback_MySingleView_RegistrarTestClass_TestRetainNSObject(IntPtr ptr, IntPtr sel, IntPtr* exception_gchandle)
+			{
+				try {
+					
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+				}
+			}
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_TestRetainString")]
+			public static unsafe void callback_MySingleView_RegistrarTestClass_TestRetainString(IntPtr ptr, IntPtr sel, IntPtr* exception_gchandle)
+			{
+				try {
+					
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+				}
+			}
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_VirtualMethod")]
+			public static unsafe void callback_MySingleView_RegistrarTestClass_VirtualMethod(IntPtr ptr, IntPtr sel, IntPtr* exception_gchandle)
+			{
+				try {
+					
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+				}
+			}
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass__ctor")]
+			public static unsafe void callback_MySingleView_RegistrarTestClass__ctor(IntPtr ptr, IntPtr sel, IntPtr* exception_gchandle)
+			{
+				try {
+					
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+				}
+			}
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_get_B1")]
+			public static unsafe byte callback_MySingleView_RegistrarTestClass_get_B1 (IntPtr ptr, IntPtr sel, IntPtr* exception_gchandle)
+			{
+				try {
+					var obj = Runtime.GetNSObject<MySingleView.RegistrarTestClass> (ptr, sel, method_handle: default, evenInFinalizerQueue: true);
+					return obj.B1 ? (byte)1 : (byte)0;
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+					return default;
+				}
+			}
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_get_NSArrayOfNSString")]
+			public static unsafe IntPtr callback_MySingleView_RegistrarTestClass_get_NSArrayOfNSString(IntPtr ptr, IntPtr sel, IntPtr* exception_gchandle)
+			{
+				try {
+					var obj = Runtime.GetNSObject<MySingleView.RegistrarTestClass> (ptr, sel, method_handle: default, evenInFinalizerQueue: true);
+					return obj.NSArrayOfNSString.Handle;
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+					return default;
+				}
+			}
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_get_NativeObjects")]
+			public static unsafe void callback_MySingleView_RegistrarTestClass_get_NativeObjects(IntPtr ptr, IntPtr sel, IntPtr* exception_gchandle)
+			{
+				try {
+					
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+				}
+			}
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_get_Property1")]
+			public static unsafe byte callback_MySingleView_RegistrarTestClass_get_Property1(IntPtr ptr, IntPtr sel, IntPtr* exception_gchandle)
+			{
+				try {
+					var obj = Runtime.GetNSObject<MySingleView.RegistrarTestClass> (ptr, sel, method_handle: default, evenInFinalizerQueue: true);
+					return obj.Property1 ? (byte)1 : (byte)0;
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+					return default;
+				}
+			}
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_get_Property2")]
+			public static unsafe byte callback_MySingleView_RegistrarTestClass_get_Property2(IntPtr ptr, IntPtr sel, IntPtr* exception_gchandle)
+			{
+				try {
+					var obj = Runtime.GetNSObject<MySingleView.RegistrarTestClass> (ptr, sel, method_handle: default, evenInFinalizerQueue: true);
+					return obj.Property2 ? (byte)1 : (byte)0;
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+					return default;
+				}
+			}
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_get_Property4")]
+			public static unsafe byte callback_MySingleView_RegistrarTestClass_get_Property4(IntPtr ptr, IntPtr sel, IntPtr* exception_gchandle)
+			{
+				try {
+					var obj = Runtime.GetNSObject<MySingleView.RegistrarTestClass> (ptr, sel, method_handle: default, evenInFinalizerQueue: true);
+					return obj.Property4 ? (byte)1 : (byte)0;
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+					return default;
+				}
+			}
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_get_Property5")]
+			public static unsafe byte callback_MySingleView_RegistrarTestClass_get_Property5(IntPtr ptr, IntPtr sel, IntPtr* exception_gchandle)
+			{
+				try {
+					var obj = Runtime.GetNSObject<MySingleView.RegistrarTestClass> (ptr, sel, method_handle: default, evenInFinalizerQueue: true);
+					return obj.Property5 ? (byte)1 : (byte)0;
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+					return default;
+				}
+			}
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_get_StaticProperty1")]
+			public static unsafe byte callback_MySingleView_RegistrarTestClass_get_StaticProperty1(IntPtr ptr, IntPtr sel, IntPtr* exception_gchandle)
+			{
+				try {
+					return MySingleView.RegistrarTestClass.StaticProperty1 ? (byte)1 : (byte)0;
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+					return default;
+				}
+			}
+
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_get_StaticProperty2")]
+			public static unsafe byte callback_MySingleView_RegistrarTestClass_get_StaticProperty2(IntPtr ptr, IntPtr sel, IntPtr* exception_gchandle)
+			{
+				try {
+					return MySingleView.RegistrarTestClass.StaticProperty2 ? (byte)1 : (byte)0;
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+					return default;
+				}
+			}
+
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_get_StaticProperty4")]
+			public static unsafe byte callback_MySingleView_RegistrarTestClass_get_StaticProperty4(IntPtr ptr, IntPtr sel, IntPtr* exception_gchandle)
+			{
+				try {
+					return MySingleView.RegistrarTestClass.StaticProperty4 ? (byte)1 : (byte)0;
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+					return default;
+				}
+			}
+
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_get_StaticProperty5")]
+			public static unsafe byte callback_MySingleView_RegistrarTestClass_get_StaticProperty5(IntPtr ptr, IntPtr sel, IntPtr* exception_gchandle)
+			{
+				try {
+					return MySingleView.RegistrarTestClass.StaticProperty5 ? (byte)1 : (byte)0;
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+					return default;
+				}
+			}
+
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_get_TestNativeEnum2")]
+			public static unsafe int callback_MySingleView_RegistrarTestClass_get_TestNativeEnum2(IntPtr ptr, IntPtr sel, IntPtr* exception_gchandle)
+			{
+				try {
+					var obj = Runtime.GetNSObject<MySingleView.RegistrarTestClass> (ptr, sel, method_handle: default, evenInFinalizerQueue: true);
+					return (int)obj.TestNativeEnum2;
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+					return default;
+				}
+			}
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_set_NSArrayOfNSString")]
+			public static unsafe void callback_MySingleView_RegistrarTestClass_set_NSArrayOfNSString(IntPtr ptr, IntPtr sel, IntPtr p0, IntPtr* exception_gchandle)
+			{
+				try {
+					var obj = Runtime.GetNSObject<MySingleView.RegistrarTestClass> (ptr, sel, method_handle: default, evenInFinalizerQueue: true);
+					var o0 = Runtime.GetNSObject<Foundation.NSArray<Foundation.NSString>> (p0, sel, method_handle: default, evenInFinalizerQueue: false);
+					obj.NSArrayOfNSString = o0;
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+				}
+			}
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_set_Property2")]
+			public static unsafe void callback_MySingleView_RegistrarTestClass_set_Property2(IntPtr ptr, IntPtr sel, byte p0, IntPtr* exception_gchandle)
+			{
+				try {
+					var obj = Runtime.GetNSObject<MySingleView.RegistrarTestClass> (ptr, sel, method_handle: default, evenInFinalizerQueue: true);
+					obj.Property2 = p0 == (byte)1;
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+				}
+			}
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_set_Property3")]
+			public static unsafe void callback_MySingleView_RegistrarTestClass_set_Property3(IntPtr ptr, IntPtr sel, byte p0, IntPtr* exception_gchandle)
+			{
+				try {
+					var obj = Runtime.GetNSObject<MySingleView.RegistrarTestClass> (ptr, sel, method_handle: default, evenInFinalizerQueue: true);
+					obj.Property3 = p0 == (byte)1;
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+				}
+			}
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_set_Property5")]
+			public static unsafe void callback_MySingleView_RegistrarTestClass_set_Property5(IntPtr ptr, IntPtr sel, byte p0, IntPtr* exception_gchandle)
+			{
+				try {
+					var obj = Runtime.GetNSObject<MySingleView.RegistrarTestClass> (ptr, sel, method_handle: default, evenInFinalizerQueue: true);
+					obj.Property5 = p0 == (byte)1;
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+				}
+			}
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_set_Property6")]
+			public static unsafe void callback_MySingleView_RegistrarTestClass_set_Property6(IntPtr ptr, IntPtr sel, byte p0, IntPtr* exception_gchandle)
+			{
+				try {
+					var obj = Runtime.GetNSObject<MySingleView.RegistrarTestClass> (ptr, sel, method_handle: default, evenInFinalizerQueue: true);
+					obj.Property6 = p0 == (byte)1;
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+				}
+			}
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_set_StaticProperty2")]
+			public static unsafe void callback_MySingleView_RegistrarTestClass_set_StaticProperty2(IntPtr ptr, IntPtr sel, byte p0, IntPtr* exception_gchandle)
+			{
+				try {
+					MySingleView.RegistrarTestClass.StaticProperty2 = p0 == (byte)1;
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+				}
+			}
+
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_set_StaticProperty3")]
+			public static unsafe void callback_MySingleView_RegistrarTestClass_set_StaticProperty3(IntPtr ptr, IntPtr sel, byte p0, IntPtr* exception_gchandle)
+			{
+				try {
+					MySingleView.RegistrarTestClass.StaticProperty3 = p0 == (byte)1;
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+				}
+			}
+
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_set_StaticProperty5")]
+			public static unsafe void callback_MySingleView_RegistrarTestClass_set_StaticProperty5(IntPtr ptr, IntPtr sel, byte p0, IntPtr* exception_gchandle)
+			{
+				try {
+					MySingleView.RegistrarTestClass.StaticProperty5 = p0 == (byte)1;
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+				}
+			}
+
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_set_StaticProperty6")]
+			public static unsafe void callback_MySingleView_RegistrarTestClass_set_StaticProperty6(IntPtr ptr, IntPtr sel, byte p0, IntPtr* exception_gchandle)
+			{
+				try {
+					MySingleView.RegistrarTestClass.StaticProperty6 = p0 == (byte)1;
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+				}
+			}
+
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_RegistrarTestClass_set_TestNativeEnum2")]
+			public static unsafe void callback_MySingleView_RegistrarTestClass_set_TestNativeEnum2(IntPtr ptr, IntPtr sel, IntPtr* exception_gchandle)
+			{
+				try {
+					
+				} catch (Exception ex) {
+					*exception_gchandle = Runtime.AllocGCHandle (ex);
+				}
+			}
+
+			[UnmanagedCallersOnly(EntryPoint = "_callback_RegistrarTestClass_GetDotnetType")]
+			public static unsafe IntPtr callback_RegistrarTestClass_GetDotnetType(IntPtr* exception_gchandle)
+				=> RegistrarHelper.GetDotnetType<MySingleView.RegistrarTestClass> (exception_gchandle);
+		}
+	}
 }
 
 namespace ObjCRuntime
@@ -255,7 +713,6 @@ namespace ObjCRuntime
 		public unsafe static void callback_Foundation_NSDispatcher_Apply(IntPtr pobj, IntPtr sel, IntPtr* exception_gchandle)
 		{
 			try {
-
 				var nSObject = Runtime.GetNSObject<Foundation.NSDispatcher>(pobj, sel, method_handle: default, evenInFinalizerQueue: true)!;
 				nSObject.Apply();
 			} catch (Exception ex) {
@@ -477,5 +934,33 @@ namespace ObjCRuntime
 		[UnmanagedCallersOnly(EntryPoint = "_callback_Foundation_NSDictionary_GetDotnetType")]
 		public unsafe static IntPtr callback_Foundation_NSDictionary_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<Foundation.NSDictionary> (exception_gchandle);
+	}
+
+	internal sealed class Foundation_NSString__Registrar_Callbacks__
+	{
+		[UnmanagedCallersOnly(EntryPoint = "_callback_Foundation_NSString_GetDotnetType")]
+		public unsafe static IntPtr callback_Foundation_NSString_GetDotnetType(IntPtr* exception_gchandle)
+			=> RegistrarHelper.GetDotnetType<Foundation.NSString> (exception_gchandle);
+	}
+
+	internal sealed class Foundation_NSNumber__Registrar_Callbacks__
+	{
+		[UnmanagedCallersOnly(EntryPoint = "_callback_Foundation_NSNumber_GetDotnetType")]
+		public unsafe static IntPtr callback_Foundation_NSNumber_GetDotnetType(IntPtr* exception_gchandle)
+			=> RegistrarHelper.GetDotnetType<Foundation.NSNumber> (exception_gchandle);
+	}
+
+	internal sealed class Foundation_NSArray__Registrar_Callbacks__
+	{
+		[UnmanagedCallersOnly(EntryPoint = "_callback_Foundation_NSArray_GetDotnetType")]
+		public unsafe static IntPtr callback_Foundation_NSNumber_GetDotnetType(IntPtr* exception_gchandle)
+			=> RegistrarHelper.GetDotnetType<Foundation.NSArray<Foundation.NSObject>> (exception_gchandle);
+	}
+
+	internal sealed class Foundation_NSNull__Registrar_Callbacks__
+	{
+		[UnmanagedCallersOnly(EntryPoint = "_callback_Foundation_NSNull_GetDotnetType")]
+		public unsafe static IntPtr callback_Foundation_NSNumber_GetDotnetType(IntPtr* exception_gchandle)
+			=> RegistrarHelper.GetDotnetType<Foundation.NSNull> (exception_gchandle);
 	}
 }

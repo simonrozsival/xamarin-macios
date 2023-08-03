@@ -8,7 +8,7 @@
 
 #if NET
 
-#define TRACE
+// #define TRACE
 
 #nullable enable
 
@@ -26,21 +26,23 @@ using ObjCRuntime;
 namespace ObjCRuntime {
 	public interface IManagedRegistrarType
 	{
+		static virtual bool IsCustomType => false;
 		static virtual NSObject CreateNSObject(NativeHandle handle) => throw new InvalidOperationException ();
 		static virtual INativeObject CreateINativeObject(NativeHandle handle, bool owns) => throw new InvalidOperationException ();
-		static virtual IntPtr GetNativeClass (out bool is_custom_type) => throw new InvalidOperationException ();
+		static virtual NativeHandle GetNativeClass () => throw new InvalidOperationException ();
 	}
 
 	internal sealed class ManagedRegistrar
 	{
+		private readonly static IntPtr s_getDotnetTypeSelector = Selector.GetHandle ("getDotnetType");
+
 		private readonly SemaphoreSlim _semaphore = new SemaphoreSlim (1, 1);
 
-		delegate IntPtr GetNativeClassFunc (out bool is_custom_type);
-
-		private Dictionary<RuntimeTypeHandle, GetNativeClassFunc> _getNativeClasses;
+		private Dictionary<RuntimeTypeHandle, Func<NativeHandle>> _getNativeClasses;
 		private Dictionary<RuntimeTypeHandle, Func<NativeHandle, NSObject>> _createNSObjects;
 		private Dictionary<RuntimeTypeHandle, Func<NativeHandle, bool, INativeObject>> _createINativeObjects;
 		private Dictionary<RuntimeTypeHandle, RuntimeTypeHandle> _protocolWrapperTypes;
+		private HashSet<RuntimeTypeHandle> _customTypes;
 
 		internal ManagedRegistrar (RuntimeTypeHandleEqualityComparer runtimeTypeHandleEqualityComparer)
 		{
@@ -48,44 +50,64 @@ namespace ObjCRuntime {
 			_createNSObjects = new (runtimeTypeHandleEqualityComparer);
 			_createINativeObjects = new (runtimeTypeHandleEqualityComparer);
 			_protocolWrapperTypes = new (runtimeTypeHandleEqualityComparer);
+			_customTypes = new (runtimeTypeHandleEqualityComparer);
 		}
 
 		internal void Register<T> ()
 			where T : IManagedRegistrarType
 		{
+#if TRACE
+			Runtime.NSLog ($"ManagedRegistrar: Registering {typeof (T)}");
+#endif
 			var type = typeof (T);
 			var handle = type.TypeHandle;
 
 			// types that are generic but don't have any generic type arguments cannot be registered
 			// this is a bug that the developer must fix
 			if (type.IsGenericType && type == type.GetGenericTypeDefinition ()) {
-				throw new InvalidOperationException (
-					$"Cannot register a generic type {type} without generic type arguments.");
+#if TRACE
+				Runtime.NSLog ($"ManagedRegistrar: {type} is generic but doesn't have any generic type arguments.");
+#endif
+				return;
 			}
 
 			_semaphore.Wait ();
-#if TRACE
-			Runtime.NSLog ($"ManagedRegistrar: Registering {type}");
-#endif
 			try {
+				if (_createNSObjects.ContainsKey (handle)) {
+#if TRACE
+					Runtime.NSLog ($"ManagedRegistrar: {type} has already been registered");
+#endif
+					return;
+				}
+
 				_createNSObjects.Add (handle, T.CreateNSObject);
 				_createINativeObjects.Add (handle, T.CreateINativeObject);
 				_getNativeClasses.Add (handle, T.GetNativeClass);
+				if (T.IsCustomType)
+					_customTypes.Add (handle);
 				// TODO protocol wrapper types
 			} finally {
 				_semaphore.Release ();
 			}
 		}
 
+		internal bool IsCustomType (Type type)
+		{
+			EnsureClassConstructorHasRun (type.TypeHandle);
+			return _customTypes.Contains (type.TypeHandle);
+		}
+
 		internal IntPtr FindClass (Type type, out bool is_custom_type)
 		{
-			is_custom_type = false;
 			EnsureClassConstructorHasRun (type.TypeHandle);
 
-			if (_getNativeClasses.TryGetValue (type.TypeHandle, out var getObjCClass))
-				return getObjCClass (out is_custom_type);
+			if (_getNativeClasses.TryGetValue (type.TypeHandle, out var getNativeClass)) {
+				is_custom_type = _customTypes.Contains (type.TypeHandle);
+				return getNativeClass ();
+			}
 
 			ThrowIfGenericType (type);
+			is_custom_type = false;
 			return IntPtr.Zero;
 		}
 
@@ -93,7 +115,7 @@ namespace ObjCRuntime {
 		{
 			is_custom_type = false;
 
-			var ptr = IntPtr_objc_msgSend_ref_bool (@class, Selector.GetHandle ("getDotnetType:"), ref is_custom_type);
+			var ptr = IntPtr_objc_msgSend_ref_bool (@class, s_getDotnetTypeSelector, ref is_custom_type);
 			if (ptr == IntPtr.Zero)
 				return null;
 
@@ -145,9 +167,12 @@ namespace ObjCRuntime {
 		[UnconditionalSuppressMessage("ReflectionAnalysis", "IL2059:UnrecognizedReflectionPattern", Justification =
 			"The static constructor of the type is preserved if and only if the whole type is preserved. " +
 			"If the type was trimmed, we won't be able to create an instance of the type anyway.")]
-		private void EnsureClassConstructorHasRun(RuntimeTypeHandle typeHandle)
+		private void EnsureClassConstructorHasRun(RuntimeTypeHandle runtimeTypeHandle)
 		{
-			RuntimeHelpers.RunClassConstructor(typeHandle);
+#if TRACE
+			Runtime.NSLog ($"ManagedRegistrar: EnsureClassConstructorHasRun(type: {Type.GetTypeFromHandle (runtimeTypeHandle)})");
+#endif
+			RuntimeHelpers.RunClassConstructor(runtimeTypeHandle);
 		}
 
 		private void ThrowIfGenericType (RuntimeTypeHandle runtimeTypeHandle)

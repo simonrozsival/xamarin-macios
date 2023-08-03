@@ -7,7 +7,7 @@
 // Copyright 2023 Microsoft Corp
 
 
-#define TRACE
+// #define TRACE
 
 #if NET
 
@@ -38,11 +38,11 @@ namespace ObjCRuntime {
 	// This class contains helper methods for the managed static registrar.
 	// The managed static registrar will make it public when needed.
 	public static class RegistrarHelper {
-		private class MapInfo {
-			internal ManagedRegistrar Registrar;
-			internal HashSet<RuntimeTypeHandle> RegisteredWrapperTypes;
+		class MapInfo {
+			public ManagedRegistrar Registrar;
+			public HashSet<RuntimeTypeHandle> RegisteredWrapperTypes;
 
-			internal MapInfo (RuntimeTypeHandleEqualityComparer comparer)
+			public MapInfo (RuntimeTypeHandleEqualityComparer comparer)
 			{
 				Registrar = new (comparer);
 				RegisteredWrapperTypes = new (comparer);
@@ -62,10 +62,10 @@ namespace ObjCRuntime {
 
 		static RegistrarHelper ()
 		{
-			StringEqualityComparer = new ();
-			RuntimeTypeHandleEqualityComparer = new ();
-			assembly_map = new (StringEqualityComparer);
-			wrapper_types = new (RuntimeTypeHandleEqualityComparer);
+			StringEqualityComparer = new StringEqualityComparer ();
+			RuntimeTypeHandleEqualityComparer = new RuntimeTypeHandleEqualityComparer ();
+			assembly_map = new Dictionary<string, MapInfo> (StringEqualityComparer);
+			wrapper_types = new Dictionary<RuntimeTypeHandle, RuntimeTypeHandle> (RuntimeTypeHandleEqualityComparer);
 		}
 
 		static NativeHandle CreateCFArray (params string[]? values)
@@ -117,7 +117,9 @@ namespace ObjCRuntime {
 			if (!Runtime.IsManagedStaticRegistrar) {
 				throw new InvalidOperationException ($"Cannot register type '{typeof (T)}' when the managed static registrar is not used.");
 			}
-
+#if TRACE
+			Console.WriteLine($"RegistrarHelper: Register {typeof(T)}, {typeof (T).Assembly}");
+#endif
 			var map = GetOrInitMapInfo (typeof (T).Assembly);
 			map.Registrar.Register<T> ();
 		}
@@ -161,6 +163,12 @@ namespace ObjCRuntime {
 		{
 			// return registrar.LookupUnmanagedFunction (symbol, id);
 			return IntPtr.Zero;
+		}
+
+		internal static bool IsCustomType (Type type)
+		{
+			var map = GetOrInitMapInfo (type.Assembly);
+			return map.Registrar.IsCustomType (type);
 		}
 
 		internal static IntPtr FindClass (Type type, out bool isCustomType)
@@ -389,9 +397,13 @@ namespace ObjCRuntime {
 
 		public unsafe static IntPtr GetDotnetType<T> (IntPtr* exception_gchandle) {
 			try {
-				var rv = Runtime.AllocGCHandle (typeof (T));
+				var type = typeof (T);
+				if (type.IsGenericType)
+					type = type.GetGenericTypeDefinition ();
+
+				var rv = Runtime.AllocGCHandle (type);
 #if TRACE
-				Runtime.NSLog ($"GetDotnetType: {typeof (T)} (GC handle: 0x{rv:x})");
+				Runtime.NSLog ($"GetDotnetType: {type} (GC handle: 0x{rv:x})");
 #endif
 				return rv;
 			} catch (Exception ex) {

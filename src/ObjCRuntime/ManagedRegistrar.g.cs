@@ -15,12 +15,11 @@ namespace AppKit {
 namespace UIKit {
 	partial class UIApplicationDelegate : NSObject, IManagedRegistrarType {
 		static UIApplicationDelegate() => RegistrarHelper.Register<UIApplicationDelegate>();
+		public static bool IsCustomType => true;
 #if __IOS__ || __MACCATALYST__
 		public static NSObject CreateNSObject(NativeHandle handle) => new UIApplicationDelegate(handle);
 #endif
-		public static IntPtr GetNativeClass (out bool is_custom_type) => get_objc_class_Microsoft_MacCatalyst__UIKit_UIApplicationDelegate (out is_custom_type);
-		[DllImport("__Internal")]
-		private static extern IntPtr get_objc_class_Microsoft_MacCatalyst__UIKit_UIApplicationDelegate (out bool is_custom_type);
+		public static NativeHandle GetNativeClass () => Class.GetHandle ("__UIKit_UIApplicationDelegate");
 	}
 	
 	partial class UIResponder : IManagedRegistrarType {
@@ -28,9 +27,7 @@ namespace UIKit {
 #if __IOS__ || __MACCATALYST__
 		public static NSObject CreateNSObject(NativeHandle handle) => new UIResponder(handle);
 #endif
-		public static IntPtr GetNativeClass (out bool is_custom_type) => get_objc_class_UIKit_UIResponder (out is_custom_type);
-		[DllImport("__Internal")]
-		private static extern IntPtr get_objc_class_UIKit_UIResponder (out bool is_custom_type);
+		public static NativeHandle GetNativeClass () => Class.GetHandle ("UIResponder");
 	}
 	
 	partial class UIViewController : IManagedRegistrarType {
@@ -38,9 +35,7 @@ namespace UIKit {
 #if __IOS__ || __MACCATALYST__
 		public static NSObject CreateNSObject(NativeHandle handle) => new UIViewController(handle);
 #endif
-		public static IntPtr GetNativeClass (out bool is_custom_type) => get_objc_class_UIKit_UIViewController (out is_custom_type);
-		[DllImport("__Internal")]
-		private static extern IntPtr get_objc_class_UIKit_UIViewController (out bool is_custom_type);
+		public static NativeHandle GetNativeClass () => Class.GetHandle ("UIViewController");
 	}
 
 	partial class UIView : IManagedRegistrarType {
@@ -48,9 +43,7 @@ namespace UIKit {
 #if __IOS__ || __MACCATALYST__
 		public static NSObject CreateNSObject(NativeHandle handle) => new UIView(handle);
 #endif
-		public static IntPtr GetNativeClass (out bool is_custom_type) => get_objc_class_UIKit_UIView (out is_custom_type);
-		[DllImport("__Internal")]
-		private static extern IntPtr get_objc_class_UIKit_UIView (out bool is_custom_type);
+		public static NativeHandle GetNativeClass () => Class.GetHandle ("UIView");
 	}
 	
 	partial class UIControl : IManagedRegistrarType {
@@ -58,16 +51,12 @@ namespace UIKit {
 #if __IOS__ || __MACCATALYST__
 		public static NSObject CreateNSObject(NativeHandle handle) => new UIControl(handle);
 #endif
-		public static IntPtr GetNativeClass (out bool is_custom_type) => get_objc_class_UIKit_UIControl (out is_custom_type);
-		[DllImport("__Internal")]
-		private static extern IntPtr get_objc_class_UIKit_UIControl (out bool is_custom_type);
+		public static NativeHandle GetNativeClass () => Class.GetHandle ("UIControl");
 	}
 
 	partial class UIControlEventProxy : IManagedRegistrarType {
 		static UIControlEventProxy() => RegistrarHelper.Register<UIControlEventProxy>();
-		public static IntPtr GetNativeClass (out bool is_custom_type) => get_objc_class_UIKit_UIControlEventProxy (out is_custom_type);
-		[DllImport("__Internal")]
-		private static extern IntPtr get_objc_class_UIKit_UIControlEventProxy (out bool is_custom_type);
+		public static NativeHandle GetNativeClass () => Class.GetHandle ("UIKit_UIControlEventProxy");
 	}
 	
 	partial class UIButton : IManagedRegistrarType {
@@ -75,9 +64,7 @@ namespace UIKit {
 #if __IOS__ || __MACCATALYST__
 		public static NSObject CreateNSObject(NativeHandle handle) => new UIButton(handle);
 #endif
-		public static IntPtr GetNativeClass (out bool is_custom_type) => get_objc_class_UIKit_UIButton (out is_custom_type);
-		[DllImport("__Internal")]
-		private static extern IntPtr get_objc_class_UIKit_UIButton (out bool is_custom_type);
+		public static NativeHandle GetNativeClass () => Class.GetHandle ("UIButton");
 	}
 
 	partial class UIApplication : IManagedRegistrarType {
@@ -85,9 +72,7 @@ namespace UIKit {
 #if __IOS__ || __MACCATALYST__
 		public static NSObject CreateNSObject(NativeHandle handle) => new UIApplication(handle);
 #endif
-		public static IntPtr GetNativeClass (out bool is_custom_type) => get_objc_class_UIKit_UIApplication (out is_custom_type);
-		[DllImport("__Internal")]
-		private static extern IntPtr get_objc_class_UIKit_UIApplication (out bool is_custom_type);
+		public static NativeHandle GetNativeClass () => Class.GetHandle ("UIApplication");
 	}
 
 	partial class UIScreen : IManagedRegistrarType {
@@ -95,9 +80,7 @@ namespace UIKit {
 #if __IOS__ || __MACCATALYST__
 		public static NSObject CreateNSObject(NativeHandle handle) => new UIScreen(handle);
 #endif
-		public static IntPtr GetNativeClass (out bool is_custom_type) => get_objc_class_UIKit_UIScreen (out is_custom_type);
-		[DllImport("__Internal")]
-		private static extern IntPtr get_objc_class_UIKit_UIScreen (out bool is_custom_type);
+		public static NativeHandle GetNativeClass () => Class.GetHandle ("UIScreen");
 	}
 	
 	partial class UIWindow : IManagedRegistrarType {
@@ -105,39 +88,29 @@ namespace UIKit {
 #if __IOS__ || __MACCATALYST__
 		public static NSObject CreateNSObject(NativeHandle handle) => new UIWindow(handle);
 #endif
-		public static IntPtr GetNativeClass (out bool is_custom_type) => get_objc_class_UIKit_UIWindow (out is_custom_type);
-		[DllImport("__Internal")]
-		private static extern IntPtr get_objc_class_UIKit_UIWindow (out bool is_custom_type);
+		public static NativeHandle GetNativeClass () => Class.GetHandle ("UIWindow");
 	}
 }
 
 namespace Foundation {
 	partial class NSDispatcher : IManagedRegistrarType {
 		static NSDispatcher() => RegistrarHelper.Register<NSDispatcher>();
-		public static IntPtr GetNativeClass (out bool is_custom_type) => get_objc_class_Foundation_NSDispatcher (out is_custom_type);
-		[DllImport("__Internal")]
-		private static extern IntPtr get_objc_class_Foundation_NSDispatcher (out bool is_custom_type);
+		public static NativeHandle GetNativeClass () => Class.GetHandle ("NSDispatcher");
 	}
 
 	partial class NSSynchronizationContextDispatcher : IManagedRegistrarType {
 		static NSSynchronizationContextDispatcher() => RegistrarHelper.Register<NSSynchronizationContextDispatcher>();
-		public static IntPtr GetNativeClass (out bool is_custom_type) => get_objc_class_Foundation_NSSynchronizationContextDispatcher (out is_custom_type);
-		[DllImport("__Internal")]
-		private static extern IntPtr get_objc_class_Foundation_NSSynchronizationContextDispatcher (out bool is_custom_type);
+		public static NativeHandle GetNativeClass () => Class.GetHandle ("__MonoMac_NSSynchronizationContextDispatcher");
 	}
 
 	partial class NSAsyncDispatcher : IManagedRegistrarType {
 		static NSAsyncDispatcher() => RegistrarHelper.Register<NSAsyncDispatcher>();
-		public static IntPtr GetNativeClass (out bool is_custom_type) => get_objc_class_Foundation_NSAsyncDispatcher (out is_custom_type);
-		[DllImport("__Internal")]
-		private static extern IntPtr get_objc_class_Foundation_NSAsyncDispatcher (out bool is_custom_type);
+		public static NativeHandle GetNativeClass () => Class.GetHandle ("NSAsyncDispatcher");
 	}
 	
 	partial class NSAsyncSynchronizationContextDispatcher : IManagedRegistrarType {
 		static NSAsyncSynchronizationContextDispatcher() => RegistrarHelper.Register<NSAsyncSynchronizationContextDispatcher>();
-		public static IntPtr GetNativeClass (out bool is_custom_type) => get_objc_class_Foundation_NSAsyncSynchronizationContextDispatcher (out is_custom_type);
-		[DllImport("__Internal")]
-		private static extern IntPtr get_objc_class_Foundation_NSAsyncSynchronizationContextDispatcher (out bool is_custom_type);
+		public static NativeHandle GetNativeClass () => Class.GetHandle ("__MonoMac_NSAsyncSynchronizationContextDispatcher");
 	}
 	
 	partial class NSRunLoop : IManagedRegistrarType {
@@ -145,9 +118,7 @@ namespace Foundation {
 #if __IOS__ || __MACCATALYST__
 		public static NSObject CreateNSObject(NativeHandle handle) => new NSRunLoop(handle);
 #endif
-		public static IntPtr GetNativeClass (out bool is_custom_type) => get_objc_class_Foundation_NSRunLoop (out is_custom_type);
-		[DllImport("__Internal")]
-		private static extern IntPtr get_objc_class_Foundation_NSRunLoop (out bool is_custom_type);
+		public static NativeHandle GetNativeClass () => Class.GetHandle ("NSRunLoop");
 	}
 	
 	partial class NSAutoreleasePool : IManagedRegistrarType {
@@ -155,9 +126,7 @@ namespace Foundation {
 #if __IOS__ || __MACCATALYST__
 		public static NSObject CreateNSObject(NativeHandle handle) => new NSAutoreleasePool(handle);
 #endif
-		public static IntPtr GetNativeClass (out bool is_custom_type) => get_objc_class_Foundation_NSAutoreleasePool (out is_custom_type);
-		[DllImport("__Internal")]
-		private static extern IntPtr get_objc_class_Foundation_NSAutoreleasePool (out bool is_custom_type);
+		public static NativeHandle GetNativeClass () => Class.GetHandle ("NSAutoreleasePool");
 	}
 	
 	partial class NSException : IManagedRegistrarType {
@@ -165,9 +134,7 @@ namespace Foundation {
 #if __IOS__ || __MACCATALYST__
 		public static NSObject CreateNSObject(NativeHandle handle) => new NSException(handle);
 #endif
-		public static IntPtr GetNativeClass (out bool is_custom_type) => get_objc_class_Foundation_NSException (out is_custom_type);
-		[DllImport("__Internal")]
-		private static extern IntPtr get_objc_class_Foundation_NSException (out bool is_custom_type);
+		public static NativeHandle GetNativeClass () => Class.GetHandle ("NSException");
 	}
 
 	partial class NSDictionary : IManagedRegistrarType {
@@ -175,18 +142,57 @@ namespace Foundation {
 #if __IOS__ || __MACCATALYST__
 		public static NSObject CreateNSObject(NativeHandle handle) => new NSDictionary(handle);
 #endif
-		public static IntPtr GetNativeClass (out bool is_custom_type) => get_objc_class_Foundation_NSDictionary (out is_custom_type);
-		[DllImport("__Internal")]
-		private static extern IntPtr get_objc_class_Foundation_NSDictionary (out bool is_custom_type);
+		public static NativeHandle GetNativeClass () => Class.GetHandle ("NSDictionary");
+	}
+
+	partial class NSArray<TKey> : IManagedRegistrarType {
+		static NSArray() => RegistrarHelper.Register<NSArray<TKey>>();
+#if __IOS__ || __MACCATALYST__
+		public static NSObject CreateNSObject(NativeHandle handle) => new NSArray<TKey>(handle);
+#endif
+		public static NativeHandle GetNativeClass () => Class.GetHandle ("NSArray");
+	}
+
+	static class NSArray_1 {
+	}
+
+	partial class NSString : IManagedRegistrarType {
+#if __IOS__ || __MACCATALYST__
+		public static NSObject CreateNSObject(NativeHandle handle) => new NSString(handle);
+#endif
+		public static NativeHandle GetNativeClass () => Class.GetHandle ("NSString");
+	}
+
+	partial class NSNumber : IManagedRegistrarType {
+		static NSNumber() => RegistrarHelper.Register<NSNumber>();
+#if __IOS__ || __MACCATALYST__
+		public static NSObject CreateNSObject(NativeHandle handle) => new NSNumber(handle);
+#endif
+		public static NativeHandle GetNativeClass () => Class.GetHandle ("NSNumber");
+	}
+
+	partial class NSNull : IManagedRegistrarType {
+		static NSNull() => RegistrarHelper.Register<NSNull>();
+#if __IOS__ || __MACCATALYST__
+		public static NSObject CreateNSObject(NativeHandle handle) => new NSNull(handle);
+#endif
+		public static NativeHandle GetNativeClass () => Class.GetHandle ("NSNull");
 	}
 
 	partial class NSObject {
 		partial class NSObject_Disposer : IManagedRegistrarType {
 			static NSObject_Disposer() => RegistrarHelper.Register<NSObject_Disposer>();
-			public static IntPtr GetNativeClass (out bool is_custom_type) => get_objc_class_Foundation_NSObject_Disposer (out is_custom_type);
-			[DllImport("__Internal")]
-			private static extern IntPtr get_objc_class_Foundation_NSObject_Disposer (out bool is_custom_type);
+			public static NativeHandle GetNativeClass () => Class.GetHandle ("__NSObject_Disposer");
 		}
+	}
+}
+
+namespace CoreGraphics {
+	partial class CGPath : IManagedRegistrarType {
+		static CGPath() => RegistrarHelper.Register<CGPath>();
+		public static INativeObject CreateINativeObject (NativeHandle handle, bool owns)
+			=> new CGPath (handle, owns);
+		public static NativeHandle GetNativeClass () => Class.GetHandle ("CGPath");
 	}
 }
 

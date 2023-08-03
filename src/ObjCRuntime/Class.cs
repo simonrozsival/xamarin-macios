@@ -5,7 +5,7 @@
 // Copyright 2011 - 2015 Xamarin Inc. All rights reserved.
 //
 
-#define LOG_TYPELOAD
+// #define LOG_TYPELOAD
 
 #nullable enable
 
@@ -692,6 +692,12 @@ namespace ObjCRuntime {
 		[BindingImpl (BindingImplOptions.Optimizable)] // To inline the Runtime.DynamicRegistrationSupported code if possible.
 		internal static bool IsCustomType (Type type)
 		{
+#if NET
+			// TODO would it be beneficial?
+			if (Runtime.IsManagedStaticRegistrar) {
+				return RegistrarHelper.IsCustomType (type);
+			}
+#endif
 			bool is_custom_type;
 			var @class = GetClassHandle (type, false, out is_custom_type);
 			if (@class != IntPtr.Zero)
