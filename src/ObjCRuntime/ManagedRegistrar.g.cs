@@ -7,14 +7,18 @@ using System.Runtime.InteropServices;
 #if MONOMAC || __MACCATALYST__
 namespace AppKit {
 	partial class ActionDispatcher : IManagedRegistrarType {
-		static ActionDispatcher() => RegistrarHelper.Register<ActionDispatcher>();
+#if USE_STATIC_CTORS
+		static ActionDispatcher() => RegistrarHelper.Register<ActionDispatcher> ();
+#endif
 	}
 }
 #endif
 
 namespace UIKit {
 	partial class UIApplicationDelegate : NSObject, IManagedRegistrarType {
-		static UIApplicationDelegate() => RegistrarHelper.Register<UIApplicationDelegate>();
+#if USE_STATIC_CTORS
+		static UIApplicationDelegate() => RegistrarHelper.Register<UIApplicationDelegate> ();
+#endif
 		public static bool IsCustomType => true;
 #if __IOS__ || __MACCATALYST__
 		public static NSObject CreateNSObject(NativeHandle handle) => new UIApplicationDelegate(handle);
@@ -23,7 +27,9 @@ namespace UIKit {
 	}
 	
 	partial class UIResponder : IManagedRegistrarType {
-		static UIResponder() => RegistrarHelper.Register<UIResponder>();
+#if USE_STATIC_CTORS
+		static UIResponder() => RegistrarHelper.Register<UIResponder> ();
+#endif
 #if __IOS__ || __MACCATALYST__
 		public static NSObject CreateNSObject(NativeHandle handle) => new UIResponder(handle);
 #endif
@@ -31,7 +37,9 @@ namespace UIKit {
 	}
 	
 	partial class UIViewController : IManagedRegistrarType {
-		static UIViewController() => RegistrarHelper.Register<UIViewController>();
+#if USE_STATIC_CTORS
+		static UIViewController() => RegistrarHelper.Register<UIViewController> ();
+#endif
 #if __IOS__ || __MACCATALYST__
 		public static NSObject CreateNSObject(NativeHandle handle) => new UIViewController(handle);
 #endif
@@ -39,7 +47,9 @@ namespace UIKit {
 	}
 
 	partial class UIView : IManagedRegistrarType {
-		static UIView() => RegistrarHelper.Register<UIView>();
+#if USE_STATIC_CTORS
+		static UIView() => RegistrarHelper.Register<UIView> ();
+#endif
 #if __IOS__ || __MACCATALYST__
 		public static NSObject CreateNSObject(NativeHandle handle) => new UIView(handle);
 #endif
@@ -47,7 +57,9 @@ namespace UIKit {
 	}
 	
 	partial class UIControl : IManagedRegistrarType {
-		static UIControl() => RegistrarHelper.Register<UIControl>();
+#if USE_STATIC_CTORS
+		static UIControl() => RegistrarHelper.Register<UIControl> ();
+#endif
 #if __IOS__ || __MACCATALYST__
 		public static NSObject CreateNSObject(NativeHandle handle) => new UIControl(handle);
 #endif
@@ -55,12 +67,16 @@ namespace UIKit {
 	}
 
 	partial class UIControlEventProxy : IManagedRegistrarType {
-		static UIControlEventProxy() => RegistrarHelper.Register<UIControlEventProxy>();
+#if USE_STATIC_CTORS
+		static UIControlEventProxy() => RegistrarHelper.Register<UIControlEventProxy> ();
+#endif
 		public static NativeHandle GetNativeClass () => Class.GetHandle ("UIKit_UIControlEventProxy");
 	}
 	
 	partial class UIButton : IManagedRegistrarType {
-		static UIButton() => RegistrarHelper.Register<UIButton>();
+#if USE_STATIC_CTORS
+		static UIButton() => RegistrarHelper.Register<UIButton> ();
+#endif
 #if __IOS__ || __MACCATALYST__
 		public static NSObject CreateNSObject(NativeHandle handle) => new UIButton(handle);
 #endif
@@ -68,7 +84,9 @@ namespace UIKit {
 	}
 
 	partial class UIApplication : IManagedRegistrarType {
-		static UIApplication() => RegistrarHelper.Register<UIApplication>();
+#if USE_STATIC_CTORS
+		static UIApplication() => RegistrarHelper.Register<UIApplication> ();
+#endif
 #if __IOS__ || __MACCATALYST__
 		public static NSObject CreateNSObject(NativeHandle handle) => new UIApplication(handle);
 #endif
@@ -76,7 +94,9 @@ namespace UIKit {
 	}
 
 	partial class UIScreen : IManagedRegistrarType {
-		static UIScreen() => RegistrarHelper.Register<UIScreen>();
+#if USE_STATIC_CTORS
+		static UIScreen() => RegistrarHelper.Register<UIScreen> ();
+#endif
 #if __IOS__ || __MACCATALYST__
 		public static NSObject CreateNSObject(NativeHandle handle) => new UIScreen(handle);
 #endif
@@ -84,7 +104,9 @@ namespace UIKit {
 	}
 	
 	partial class UIWindow : IManagedRegistrarType {
-		static UIWindow() => RegistrarHelper.Register<UIWindow>();
+#if USE_STATIC_CTORS
+		static UIWindow() => RegistrarHelper.Register<UIWindow> ();
+#endif
 #if __IOS__ || __MACCATALYST__
 		public static NSObject CreateNSObject(NativeHandle handle) => new UIWindow(handle);
 #endif
@@ -94,27 +116,37 @@ namespace UIKit {
 
 namespace Foundation {
 	partial class NSDispatcher : IManagedRegistrarType {
-		static NSDispatcher() => RegistrarHelper.Register<NSDispatcher>();
+#if USE_STATIC_CTORS
+		static NSDispatcher() => RegistrarHelper.Register<NSDispatcher> ();
+#endif
 		public static NativeHandle GetNativeClass () => Class.GetHandle ("NSDispatcher");
 	}
 
 	partial class NSSynchronizationContextDispatcher : IManagedRegistrarType {
-		static NSSynchronizationContextDispatcher() => RegistrarHelper.Register<NSSynchronizationContextDispatcher>();
+#if USE_STATIC_CTORS
+		static NSSynchronizationContextDispatcher() => RegistrarHelper.Register<NSSynchronizationContextDispatcher> ();
+#endif
 		public static NativeHandle GetNativeClass () => Class.GetHandle ("__MonoMac_NSSynchronizationContextDispatcher");
 	}
 
 	partial class NSAsyncDispatcher : IManagedRegistrarType {
-		static NSAsyncDispatcher() => RegistrarHelper.Register<NSAsyncDispatcher>();
+#if USE_STATIC_CTORS
+		static NSAsyncDispatcher() => RegistrarHelper.Register<NSAsyncDispatcher> ();
+#endif
 		public static NativeHandle GetNativeClass () => Class.GetHandle ("NSAsyncDispatcher");
 	}
 	
 	partial class NSAsyncSynchronizationContextDispatcher : IManagedRegistrarType {
-		static NSAsyncSynchronizationContextDispatcher() => RegistrarHelper.Register<NSAsyncSynchronizationContextDispatcher>();
+#if USE_STATIC_CTORS
+		static NSAsyncSynchronizationContextDispatcher() => RegistrarHelper.Register<NSAsyncSynchronizationContextDispatcher> ();
+#endif
 		public static NativeHandle GetNativeClass () => Class.GetHandle ("__MonoMac_NSAsyncSynchronizationContextDispatcher");
 	}
 	
 	partial class NSRunLoop : IManagedRegistrarType {
-		static NSRunLoop() => RegistrarHelper.Register<NSRunLoop>();
+#if USE_STATIC_CTORS
+		static NSRunLoop() => RegistrarHelper.Register<NSRunLoop> ();
+#endif
 #if __IOS__ || __MACCATALYST__
 		public static NSObject CreateNSObject(NativeHandle handle) => new NSRunLoop(handle);
 #endif
@@ -122,7 +154,9 @@ namespace Foundation {
 	}
 	
 	partial class NSAutoreleasePool : IManagedRegistrarType {
-		static NSAutoreleasePool() => RegistrarHelper.Register<NSAutoreleasePool>();
+#if USE_STATIC_CTORS
+		static NSAutoreleasePool() => RegistrarHelper.Register<NSAutoreleasePool> ();
+#endif
 #if __IOS__ || __MACCATALYST__
 		public static NSObject CreateNSObject(NativeHandle handle) => new NSAutoreleasePool(handle);
 #endif
@@ -130,7 +164,9 @@ namespace Foundation {
 	}
 	
 	partial class NSException : IManagedRegistrarType {
-		static NSException() => RegistrarHelper.Register<NSException>();
+#if USE_STATIC_CTORS
+		static NSException() => RegistrarHelper.Register<NSException> ();
+#endif
 #if __IOS__ || __MACCATALYST__
 		public static NSObject CreateNSObject(NativeHandle handle) => new NSException(handle);
 #endif
@@ -138,7 +174,9 @@ namespace Foundation {
 	}
 
 	partial class NSDictionary : IManagedRegistrarType {
-		static NSDictionary() => RegistrarHelper.Register<NSDictionary>();
+#if USE_STATIC_CTORS
+		static NSDictionary() => RegistrarHelper.Register<NSDictionary> ();
+#endif
 #if __IOS__ || __MACCATALYST__
 		public static NSObject CreateNSObject(NativeHandle handle) => new NSDictionary(handle);
 #endif
@@ -146,17 +184,30 @@ namespace Foundation {
 	}
 
 	partial class NSArray<TKey> : IManagedRegistrarType {
-		static NSArray() => RegistrarHelper.Register<NSArray<TKey>>();
+		// !!! We need to ALWAYS register all generic types in static constructors because we don't know
+		// the generic arguments in the UCO called from the "module initializer".
+		// Would it make sense to have separate strategies for non-generic and generic types?
+		// - static ctors:
+		//    - works also for generic types
+		//    - shouldn't affect startup times that much
+		// - module initializer:
+		//    - solves (should solve) problems with static field initializers
+		static NSArray () => RegistrarHelper.Register<NSArray<TKey>> ();
 #if __IOS__ || __MACCATALYST__
 		public static NSObject CreateNSObject(NativeHandle handle) => new NSArray<TKey>(handle);
 #endif
 		public static NativeHandle GetNativeClass () => Class.GetHandle ("NSArray");
+		// TODO: could the generated Objective-C classes also hold generic arguments?
+		// it might be possible to create instances of NSArray<TKey> from Objective-C 🤔?
 	}
 
 	static class NSArray_1 {
 	}
 
 	partial class NSString : IManagedRegistrarType {
+#if USE_STATIC_CTORS
+		static NSString() => RegistrarHelper.Register<NSString> ();
+#endif
 #if __IOS__ || __MACCATALYST__
 		public static NSObject CreateNSObject(NativeHandle handle) => new NSString(handle);
 #endif
@@ -164,7 +215,9 @@ namespace Foundation {
 	}
 
 	partial class NSNumber : IManagedRegistrarType {
-		static NSNumber() => RegistrarHelper.Register<NSNumber>();
+#if USE_STATIC_CTORS
+		static NSNumber() => RegistrarHelper.Register<NSNumber> ();
+#endif
 #if __IOS__ || __MACCATALYST__
 		public static NSObject CreateNSObject(NativeHandle handle) => new NSNumber(handle);
 #endif
@@ -172,7 +225,9 @@ namespace Foundation {
 	}
 
 	partial class NSNull : IManagedRegistrarType {
-		static NSNull() => RegistrarHelper.Register<NSNull>();
+#if USE_STATIC_CTORS
+		static NSNull() => RegistrarHelper.Register<NSNull> ();
+#endif
 #if __IOS__ || __MACCATALYST__
 		public static NSObject CreateNSObject(NativeHandle handle) => new NSNull(handle);
 #endif
@@ -181,7 +236,9 @@ namespace Foundation {
 
 	partial class NSObject {
 		partial class NSObject_Disposer : IManagedRegistrarType {
-			static NSObject_Disposer() => RegistrarHelper.Register<NSObject_Disposer>();
+	#if USE_STATIC_CTORS
+		static NSObject_Disposer() => RegistrarHelper.Register<NSObject_Disposer> ();
+#endif
 			public static NativeHandle GetNativeClass () => Class.GetHandle ("__NSObject_Disposer");
 		}
 	}
@@ -189,7 +246,9 @@ namespace Foundation {
 
 namespace CoreGraphics {
 	partial class CGPath : IManagedRegistrarType {
-		static CGPath() => RegistrarHelper.Register<CGPath>();
+#if USE_STATIC_CTORS
+		static CGPath() => RegistrarHelper.Register<CGPath> ();
+#endif
 		public static INativeObject CreateINativeObject (NativeHandle handle, bool owns)
 			=> new CGPath (handle, owns);
 		public static NativeHandle GetNativeClass () => Class.GetHandle ("CGPath");

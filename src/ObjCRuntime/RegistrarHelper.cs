@@ -411,6 +411,16 @@ namespace ObjCRuntime {
 				return IntPtr.Zero;
 			}
 		}
+		
+		public unsafe static void Register<T> (IntPtr* exception_gchandle)
+			where T : IManagedRegistrarType
+		{
+			try {
+				Register<T> ();
+			} catch (Exception ex) {
+				*exception_gchandle = Runtime.AllocGCHandle(ex);
+			}
+		}
 	}
 }
 

@@ -1,3 +1,4 @@
+#define USE_STATIC_CTORS
 #nullable enable
 
 using System;
@@ -11,6 +12,16 @@ using MySingleView;
 
 namespace MySingleView
 {
+	static class RegistrarInit {
+		[ModuleInitializer]
+		public static void InitializeManagedStaticRegistrar () {
+			initialize_managed_static_registrar ();
+		}
+
+		[DllImport ("__Internal")]
+		public extern static void initialize_managed_static_registrar ();
+	}
+
 	partial class AppDelegate : ObjCRuntime.IManagedRegistrarType
 	{
 		// Important: If the type has its own static ctor, the `RegisterType` method must be called manually.
@@ -26,7 +37,9 @@ namespace MySingleView
 		// 	}
 		// }
 
-		static AppDelegate () => RegistrarHelper.Register<AppDelegate> ();
+#if USE_STATIC_CTORS
+		static AppDelegate() => RegistrarHelper.Register<AppDelegate> ();
+#endif
 		public static new bool IsCustomType => true;
 		public static new NativeHandle GetNativeClass () => Class.GetHandle ("MySingleView_AppDelegate");
 		public static new Foundation.NSObject CreateNSObject (NativeHandle handle) => new AppDelegate (handle);
@@ -65,7 +78,9 @@ namespace MySingleView
 	// }
 	
 	partial class RegistrarTestClass : IManagedRegistrarType {
+#if USE_STATIC_CTORS
 		static RegistrarTestClass () => RegistrarHelper.Register<RegistrarTestClass> ();
+#endif
 		public static bool IsCustomType => true;
 		public static Foundation.NSObject CreateNSObject (NativeHandle handle) => new RegistrarTestClass (handle);
 		public RegistrarTestClass () : base () {}
@@ -525,6 +540,10 @@ namespace MySingleView
 			[UnmanagedCallersOnly(EntryPoint = "_callback_RegistrarTestClass_GetDotnetType")]
 			public static unsafe IntPtr callback_RegistrarTestClass_GetDotnetType(IntPtr* exception_gchandle)
 				=> RegistrarHelper.GetDotnetType<MySingleView.RegistrarTestClass> (exception_gchandle);
+
+			[UnmanagedCallersOnly(EntryPoint = "_register_MySingleView_RegistrarTestClass")]
+			public static unsafe IntPtr register_MySingleView_RegistrarTestClass(IntPtr* exception_gchandle)
+				=> RegistrarHelper.GetDotnetType<MySingleView.RegistrarTestClass> (exception_gchandle);
 		}
 	}
 }
@@ -571,6 +590,10 @@ namespace ObjCRuntime
 		[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_AppDelegate_GetDotnetType")]
 		public unsafe static IntPtr callback_MySingleView_AppDelegate_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<MySingleView.AppDelegate> (exception_gchandle);
+			
+		[UnmanagedCallersOnly(EntryPoint = "_register_MySingleView_AppDelegate")]
+		public static unsafe void _register_MySingleView_AppDelegate(IntPtr* exception_gchandle)
+			=> RegistrarHelper.Register<MySingleView.AppDelegate> (exception_gchandle);
 	}
 
 	// public static class MySingleView_CustomGenericNSObject_2__Registrar_Callbacks__
@@ -639,6 +662,10 @@ namespace ObjCRuntime
 		[UnmanagedCallersOnly(EntryPoint = "_callback___monomac_internal_ActionDispatcher_GetDotnetType")]
 		public unsafe static IntPtr callback_AppKit_ActionDispatcher_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<AppKit.ActionDispatcher> (exception_gchandle);
+
+		[UnmanagedCallersOnly(EntryPoint = "_register___monomac_internal_ActionDispatcher")]
+		public unsafe static void register_AppKit_ActionDispatcher(IntPtr* exception_gchandle)
+			=> RegistrarHelper.Register<AppKit.ActionDispatcher> (exception_gchandle);
 	}
 #endif
 
@@ -667,6 +694,10 @@ namespace ObjCRuntime
 		[UnmanagedCallersOnly(EntryPoint = "_callback_Microsoft_MacCatalyst__UIKit_UIApplicationDelegate_GetDotnetType")]
 		public unsafe static IntPtr callback_UIKit_UIApplicationDelegate_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<UIKit.UIApplicationDelegate> (exception_gchandle);
+
+		[UnmanagedCallersOnly(EntryPoint = "_register_Microsoft_MacCatalyst__UIKit_UIApplicationDelegate")]
+		public unsafe static void register_UIKit_UIApplicationDelegate(IntPtr* exception_gchandle)
+			=> RegistrarHelper.Register<UIKit.UIApplicationDelegate> (exception_gchandle);
 	}
 
 	internal sealed class UIKit_UIControlEventProxy__Registrar_Callbacks__
@@ -685,6 +716,10 @@ namespace ObjCRuntime
 		[UnmanagedCallersOnly(EntryPoint = "_callback_UIKit_UIControlEventProxy_GetDotnetType")]
 		public unsafe static IntPtr callback_UIKit_UIControlEventProxy_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<UIKit.UIControlEventProxy> (exception_gchandle);
+
+		[UnmanagedCallersOnly(EntryPoint = "_register_UIKit_UIControlEventProxy")]
+		public unsafe static void register_UIKit_UIControlEventProxy(IntPtr* exception_gchandle)
+			=> RegistrarHelper.Register<UIKit.UIControlEventProxy> (exception_gchandle);
 	}
 
 	internal sealed class Foundation_NSDispatcher__Registrar_Callbacks__
@@ -723,6 +758,10 @@ namespace ObjCRuntime
 		[UnmanagedCallersOnly(EntryPoint = "_callback_Foundation_NSDispatcher_GetDotnetType")]
 		public unsafe static IntPtr callback_Foundation_NSDispatcher_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<Foundation.NSDispatcher> (exception_gchandle);
+
+		[UnmanagedCallersOnly(EntryPoint = "_register_Foundation_NSDispatcher")]
+		public unsafe static void register_Foundation_NSDispatcher(IntPtr* exception_gchandle)
+			=> RegistrarHelper.Register<Foundation.NSDispatcher> (exception_gchandle);
 	}
 
 	internal sealed class Foundation_NSAsyncDispatcher__Registrar_Callbacks__
@@ -760,6 +799,10 @@ namespace ObjCRuntime
 		[UnmanagedCallersOnly(EntryPoint = "_callback_Foundation_NSAsyncDispatcher_GetDotnetType")]
 		public unsafe static IntPtr callback_Foundation_NSAsyncDispatcher_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<Foundation.NSAsyncDispatcher> (exception_gchandle);
+
+		[UnmanagedCallersOnly(EntryPoint = "_register_Foundation_NSAsyncDispatcher")]
+		public unsafe static void register_Foundation_NSAsyncDispatcher(IntPtr* exception_gchandle)
+			=> RegistrarHelper.Register<Foundation.NSAsyncDispatcher> (exception_gchandle);
 	}
 
 	internal sealed class Foundation_NSAsyncSynchronizationContextDispatcher__Registrar_Callbacks__
@@ -797,6 +840,10 @@ namespace ObjCRuntime
 		[UnmanagedCallersOnly(EntryPoint = "_callback___MonoMac_NSAsyncSynchronizationContextDispatcher_GetDotnetType")]
 		public unsafe static IntPtr callback_Foundation_NSAsyncSynchronizationContextDispatcher_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<Foundation.NSAsyncSynchronizationContextDispatcher> (exception_gchandle);
+
+		[UnmanagedCallersOnly(EntryPoint = "_register_Foundation_NSAsyncSynchronizationContextDispatcher")]
+		public unsafe static void register_Foundation_NSAsyncSynchronizationContextDispatcher(IntPtr* exception_gchandle)
+			=> RegistrarHelper.Register<Foundation.NSAsyncSynchronizationContextDispatcher> (exception_gchandle);
 	}
 
 	internal sealed class Foundation_NSSynchronizationContextDispatcher__Registrar_Callbacks__
@@ -815,6 +862,10 @@ namespace ObjCRuntime
 		[UnmanagedCallersOnly(EntryPoint = "_callback___MonoMac_NSSynchronizationContextDispatcher_GetDotnetType")]
 		public unsafe static IntPtr callback_Foundation_NSSynchronizationContextDispatcher_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<Foundation.NSSynchronizationContextDispatcher> (exception_gchandle);
+
+		[UnmanagedCallersOnly(EntryPoint = "_register_Foundation_NSSynchronizationContextDispatcher")]
+		public unsafe static void register_Foundation_NSSynchronizationContextDispatcher(IntPtr* exception_gchandle)
+			=> RegistrarHelper.Register<Foundation.NSSynchronizationContextDispatcher> (exception_gchandle);
 	}
 	
 	internal sealed class Foundation_NSObject_Disposer__Registrar_Callbacks__
@@ -850,6 +901,10 @@ namespace ObjCRuntime
 		[UnmanagedCallersOnly(EntryPoint = "_callback___NSObject_Disposer_GetDotnetType")]
 		public unsafe static IntPtr callback_Foundation_NSObject_NSObject_Disposer_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<Foundation.NSObject.NSObject_Disposer> (exception_gchandle);
+
+		[UnmanagedCallersOnly(EntryPoint = "_register_Foundation_NSObject_Disposer")]
+		public unsafe static void register_Foundation_NSObject_NSObject_Disposer(IntPtr* exception_gchandle)
+			=> RegistrarHelper.Register<Foundation.NSObject.NSObject_Disposer> (exception_gchandle);
 	}
 	
 	internal sealed class Foundation_NSException__Registrar_Callbacks__
@@ -857,6 +912,10 @@ namespace ObjCRuntime
 		[UnmanagedCallersOnly(EntryPoint = "_callback_Foundation_NSException_GetDotnetType")]
 		public unsafe static IntPtr callback_Foundation_NSException_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<Foundation.NSException> (exception_gchandle);
+
+		[UnmanagedCallersOnly(EntryPoint = "_register_Foundation_NSException")]
+		public unsafe static void register_Foundation_NSException(IntPtr* exception_gchandle)
+			=> RegistrarHelper.Register<Foundation.NSException> (exception_gchandle);
 	}
 
 	internal sealed class UIKit_UIApplication__Registrar_Callbacks__
@@ -864,6 +923,10 @@ namespace ObjCRuntime
 		[UnmanagedCallersOnly(EntryPoint = "_callback_UIKit_UIApplication_GetDotnetType")]
 		public unsafe static IntPtr callback_UIKit_UIApplication_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<UIKit.UIApplication> (exception_gchandle);
+
+		[UnmanagedCallersOnly(EntryPoint = "_register_UIKit_UIApplication")]
+		public unsafe static void register_UIKit_UIApplication(IntPtr* exception_gchandle)
+			=> RegistrarHelper.Register<UIKit.UIApplication> (exception_gchandle);
 	}
 
 	internal sealed class UIKit_UIResponder__Registrar_Callbacks__
@@ -871,6 +934,10 @@ namespace ObjCRuntime
 		[UnmanagedCallersOnly(EntryPoint = "_callback_UIKit_UIResponder_GetDotnetType")]
 		public unsafe static IntPtr callback_UIKit_UIResponder_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<UIKit.UIResponder> (exception_gchandle);
+
+		[UnmanagedCallersOnly(EntryPoint = "_register_UIKit_UIResponder")]
+		public unsafe static void register_UIKit_UIResponder(IntPtr* exception_gchandle)
+			=> RegistrarHelper.Register<UIKit.UIResponder> (exception_gchandle);
 	}
 
 	internal sealed class UIKit_UIViewController__Registrar_Callbacks__
@@ -878,6 +945,10 @@ namespace ObjCRuntime
 		[UnmanagedCallersOnly(EntryPoint = "_callback_UIKit_UIViewController_GetDotnetType")]
 		public unsafe static IntPtr callback_UIKit_UIViewController_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<UIKit.UIViewController> (exception_gchandle);
+
+		[UnmanagedCallersOnly(EntryPoint = "_register_UIKit_UIViewController")]
+		public unsafe static void register_UIKit_UIViewController(IntPtr* exception_gchandle)
+			=> RegistrarHelper.Register<UIKit.UIViewController> (exception_gchandle);
 	}
 
 	internal sealed class UIKit_UIView__Registrar_Callbacks__
@@ -885,6 +956,10 @@ namespace ObjCRuntime
 		[UnmanagedCallersOnly(EntryPoint = "_callback_UIKit_UIView_GetDotnetType")]
 		public unsafe static IntPtr callback_UIKit_UIView_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<UIKit.UIView> (exception_gchandle);
+
+		[UnmanagedCallersOnly(EntryPoint = "_register_UIKit_UIView")]
+		public unsafe static void register_UIKit_UIView(IntPtr* exception_gchandle)
+			=> RegistrarHelper.Register<UIKit.UIView> (exception_gchandle);
 	}
 
 	internal sealed class UIKit_UIControl__Registrar_Callbacks__
@@ -892,6 +967,10 @@ namespace ObjCRuntime
 		[UnmanagedCallersOnly(EntryPoint = "_callback_UIKit_UIControl_GetDotnetType")]
 		public unsafe static IntPtr callback_UIKit_UIControl_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<UIKit.UIControl> (exception_gchandle);
+
+		[UnmanagedCallersOnly(EntryPoint = "_register_UIKit_UIControl")]
+		public unsafe static void register_UIKit_UIControl(IntPtr* exception_gchandle)
+			=> RegistrarHelper.Register<UIKit.UIControl> (exception_gchandle);
 	}
 
 	internal sealed class UIKit_UIButton__Registrar_Callbacks__
@@ -899,6 +978,10 @@ namespace ObjCRuntime
 		[UnmanagedCallersOnly(EntryPoint = "_callback_UIKit_UIButton_GetDotnetType")]
 		public unsafe static IntPtr callback_UIKit_UIButton_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<UIKit.UIButton> (exception_gchandle);
+
+		[UnmanagedCallersOnly(EntryPoint = "_register_UIKit_UIButton")]
+		public unsafe static void register_UIKit_UIButton(IntPtr* exception_gchandle)
+			=> RegistrarHelper.Register<UIKit.UIButton> (exception_gchandle);
 	}
 
 	internal sealed class UIKit_UIScreen__Registrar_Callbacks__
@@ -906,6 +989,10 @@ namespace ObjCRuntime
 		[UnmanagedCallersOnly(EntryPoint = "_callback_UIKit_UIScreen_GetDotnetType")]
 		public unsafe static IntPtr callback_UIKit_UIScreen_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<UIKit.UIScreen> (exception_gchandle);
+
+		[UnmanagedCallersOnly(EntryPoint = "_register_UIKit_UIScreen")]
+		public unsafe static void register_UIKit_UIScreen(IntPtr* exception_gchandle)
+			=> RegistrarHelper.Register<UIKit.UIScreen> (exception_gchandle);
 	}
 
 	internal sealed class UIKit_UIWindow__Registrar_Callbacks__
@@ -913,6 +1000,10 @@ namespace ObjCRuntime
 		[UnmanagedCallersOnly(EntryPoint = "_callback_UIKit_UIWindow_GetDotnetType")]
 		public unsafe static IntPtr callback_UIKit_UIWindow_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<UIKit.UIWindow> (exception_gchandle);
+
+		[UnmanagedCallersOnly(EntryPoint = "_register_UIKit_UIWindow")]
+		public unsafe static void register_UIKit_UIWindow(IntPtr* exception_gchandle)
+			=> RegistrarHelper.Register<UIKit.UIWindow> (exception_gchandle);
 	}
 
 	internal sealed class Foundation_NSRunLoop__Registrar_Callbacks__
@@ -920,6 +1011,10 @@ namespace ObjCRuntime
 		[UnmanagedCallersOnly(EntryPoint = "_callback_Foundation_NSRunLoop_GetDotnetType")]
 		public unsafe static IntPtr callback_Foundation_NSRunLoop_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<Foundation.NSRunLoop> (exception_gchandle);
+
+		[UnmanagedCallersOnly(EntryPoint = "_register_Foundation_NSRunLoop")]
+		public unsafe static void register_Foundation_NSRunLoop(IntPtr* exception_gchandle)
+			=> RegistrarHelper.Register<Foundation.NSRunLoop> (exception_gchandle);
 	}
 
 	internal sealed class Foundation_NSAutoreleasePool__Registrar_Callbacks__
@@ -927,6 +1022,10 @@ namespace ObjCRuntime
 		[UnmanagedCallersOnly(EntryPoint = "_callback_Foundation_NSAutoreleasePool_GetDotnetType")]
 		public unsafe static IntPtr callback_Foundation_NSAutoreleasePool_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<Foundation.NSAutoreleasePool> (exception_gchandle);
+
+		[UnmanagedCallersOnly(EntryPoint = "_register_Foundation_NSAutoreleasePool")]
+		public unsafe static void register_Foundation_NSAutoreleasePool(IntPtr* exception_gchandle)
+			=> RegistrarHelper.Register<Foundation.NSAutoreleasePool> (exception_gchandle);
 	}
 
 	internal sealed class Foundation_NSDictionary__Registrar_Callbacks__
@@ -934,6 +1033,10 @@ namespace ObjCRuntime
 		[UnmanagedCallersOnly(EntryPoint = "_callback_Foundation_NSDictionary_GetDotnetType")]
 		public unsafe static IntPtr callback_Foundation_NSDictionary_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<Foundation.NSDictionary> (exception_gchandle);
+
+		[UnmanagedCallersOnly(EntryPoint = "_register_Foundation_NSDictionary")]
+		public unsafe static void register_Foundation_NSDictionary(IntPtr* exception_gchandle)
+			=> RegistrarHelper.Register<Foundation.NSDictionary> (exception_gchandle);
 	}
 
 	internal sealed class Foundation_NSString__Registrar_Callbacks__
@@ -941,6 +1044,10 @@ namespace ObjCRuntime
 		[UnmanagedCallersOnly(EntryPoint = "_callback_Foundation_NSString_GetDotnetType")]
 		public unsafe static IntPtr callback_Foundation_NSString_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<Foundation.NSString> (exception_gchandle);
+
+		[UnmanagedCallersOnly(EntryPoint = "_register_Foundation_NSString")]
+		public unsafe static void register_Foundation_NSString(IntPtr* exception_gchandle)
+			=> RegistrarHelper.Register<Foundation.NSString> (exception_gchandle);
 	}
 
 	internal sealed class Foundation_NSNumber__Registrar_Callbacks__
@@ -948,6 +1055,10 @@ namespace ObjCRuntime
 		[UnmanagedCallersOnly(EntryPoint = "_callback_Foundation_NSNumber_GetDotnetType")]
 		public unsafe static IntPtr callback_Foundation_NSNumber_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<Foundation.NSNumber> (exception_gchandle);
+
+		[UnmanagedCallersOnly(EntryPoint = "_register_Foundation_NSNumber")]
+		public unsafe static void register_Foundation_NSNumber(IntPtr* exception_gchandle)
+			=> RegistrarHelper.Register<Foundation.NSNumber> (exception_gchandle);
 	}
 
 	internal sealed class Foundation_NSArray__Registrar_Callbacks__
@@ -955,6 +1066,11 @@ namespace ObjCRuntime
 		[UnmanagedCallersOnly(EntryPoint = "_callback_Foundation_NSArray_GetDotnetType")]
 		public unsafe static IntPtr callback_Foundation_NSNumber_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<Foundation.NSArray<Foundation.NSObject>> (exception_gchandle);
+
+		// TODO: This doesn't solve the problem with generic types
+		[UnmanagedCallersOnly(EntryPoint = "_register_Foundation_NSArray")]
+		public unsafe static void register_Foundation_NSNumber(IntPtr* exception_gchandle)
+			=> RegistrarHelper.Register<Foundation.NSArray<Foundation.NSObject>> (exception_gchandle);
 	}
 
 	internal sealed class Foundation_NSNull__Registrar_Callbacks__
@@ -962,5 +1078,16 @@ namespace ObjCRuntime
 		[UnmanagedCallersOnly(EntryPoint = "_callback_Foundation_NSNull_GetDotnetType")]
 		public unsafe static IntPtr callback_Foundation_NSNumber_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<Foundation.NSNull> (exception_gchandle);
+
+		[UnmanagedCallersOnly(EntryPoint = "_register_Foundation_NSNull")]
+		public unsafe static void register_Foundation_NSNumber(IntPtr* exception_gchandle)
+			=> RegistrarHelper.Register<Foundation.NSNull> (exception_gchandle);
+	}
+
+	internal sealed class CoreGraphics_CGPath__Registrar_Callbacks__
+	{
+		[UnmanagedCallersOnly(EntryPoint = "_register_CoreGraphics_CGPath")]
+		public unsafe static void register_Foundation_NSNumber(IntPtr* exception_gchandle)
+			=> RegistrarHelper.Register<CoreGraphics.CGPath> (exception_gchandle);
 	}
 }

@@ -78,29 +78,29 @@ namespace MySingleView {
 				Console.WriteLine($"---");
 				var rv = Runtime.GetNSObject<NSArray<NSString>> (arr);
 				if (rv is null) Console.WriteLine ("[FAIL]: method");
-				else Console.WriteLine ($"[OK]: method: {rv}");
+				// else Console.WriteLine ($"[OK]: method: {rv}");
 
 				using (var number_array = NSArray<NSNumber>.FromNSObjects ((NSNumber) 314)) {
 					rv = Runtime.GetNSObject<NSArray<NSString>> (Messaging.IntPtr_objc_msgSend_IntPtr (obj.Handle, Selector.GetHandle ("fetchNSArrayOfNSString:"), number_array.Handle));
 					if (rv is null) Console.WriteLine("[FAIL]: method param");
-					else Console.WriteLine ($"[OK]: method param: {rv}");
+					// else Console.WriteLine ($"[OK]: method param: {rv}");
 				}
 
 				rv = Runtime.GetNSObject<NSArray<NSString>> (Messaging.IntPtr_objc_msgSend (obj.Handle, Selector.GetHandle ("nSArrayOfNSString")));
 				if (rv is null) Console.WriteLine("[FAIL]: property");
-				else Console.WriteLine ($"[OK]: property: {rv}");
+				// else Console.WriteLine ($"[OK]: property: {rv}");
 
 				Messaging.void_objc_msgSend_IntPtr (obj.Handle, Selector.GetHandle ("setNSArrayOfNSString:"), IntPtr.Zero);
 				Messaging.void_objc_msgSend_IntPtr (obj.Handle, Selector.GetHandle ("setNSArrayOfNSString:"), rv.Handle);
 
 				var rv2 = Runtime.GetNSObject<NSArray<NSArray<NSString>>> (Messaging.IntPtr_objc_msgSend_IntPtr (obj.Handle, Selector.GetHandle ("fetchComplexGenericType:"), IntPtr.Zero));
 				if (rv2 is null) Console.WriteLine("[FAIL]: complex");
-				else Console.WriteLine ($"[OK]: complex: {rv2}");
+				// else Console.WriteLine ($"[OK]: complex: {rv2}");
 
 				using (var complex = new NSArray<NSDictionary<NSString, NSArray<NSNumber>>> ()) {
 					Runtime.GetNSObject<NSArray<NSArray<NSString>>> (Messaging.IntPtr_objc_msgSend_IntPtr (obj.Handle, Selector.GetHandle ("fetchComplexGenericType:"), complex.Handle));
 					if (rv2 is null) Console.WriteLine("[FAIL]: complex param");
-					else Console.WriteLine ($"[OK]: complex param: {rv2}");
+					// else Console.WriteLine ($"[OK]: complex param: {rv2}");
 				}
 			}
 		}

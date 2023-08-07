@@ -52,7 +52,7 @@ namespace Xamarin.Linker {
 
 			var mainLinkerFlags = new List<MSBuildItem> ();
 			if (Configuration.Application.DeadStrip) {
-				mainLinkerFlags.Add (new MSBuildItem ("-dead_strip"));
+				// mainLinkerFlags.Add (new MSBuildItem ("-dead_strip"));
 			}
 			Configuration.WriteOutputForMSBuild ("_AssemblyLinkerFlags", mainLinkerFlags);
 

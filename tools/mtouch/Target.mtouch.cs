@@ -1521,7 +1521,7 @@ namespace Xamarin.Bundler {
 			linker_flags.AddOtherFlag (App.CustomLinkFlags);
 
 			if (App.DeadStrip)
-				linker_flags.AddOtherFlag ("-dead_strip");
+				// linker_flags.AddOtherFlag ("-dead_strip");
 
 			if (App.IsExtension) {
 				if (App.Platform == ApplePlatform.iOS && Driver.XcodeVersion.Major < 7) {
