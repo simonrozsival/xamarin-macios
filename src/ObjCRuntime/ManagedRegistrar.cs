@@ -102,7 +102,7 @@ namespace ObjCRuntime {
 			EnsureClassConstructorHasRun (type.TypeHandle);
 
 			if (_getNativeClasses.TryGetValue (type.TypeHandle, out var getNativeClass)) {
-				is_custom_type = _customTypes.Contains (type.TypeHandle);
+				is_custom_type = IsCustomType (type);
 				return getNativeClass ();
 			}
 
@@ -111,15 +111,22 @@ namespace ObjCRuntime {
 			return IntPtr.Zero;
 		}
 
+		// TODO is this even called? I think it's not.
+		// - and I don't think I solved the case for C structs (e.g., CGPath)
 		internal static Type? FindType (NativeHandle @class, out bool is_custom_type)
 		{
 			is_custom_type = false;
-
-			var ptr = IntPtr_objc_msgSend_ref_bool (@class, s_getDotnetTypeSelector, ref is_custom_type);
+#if TRACE
+			Runtime.NSLog ($"ManagedRegistrar: FindType(@class: {@class})");
+#endif
+			var ptr = IntPtr_objc_msgSend (@class, s_getDotnetTypeSelector);
 			if (ptr == IntPtr.Zero)
 				return null;
 
-			return GCHandle.FromIntPtr (ptr).Target as Type;
+			var type = GCHandle.FromIntPtr (ptr).Target as Type;
+			is_custom_type = IsCustomType (type);
+
+			return type;
 		}
 
 		internal NSObject? CreateNSObject(RuntimeTypeHandle runtimeTypeHandle, NativeHandle handle)
@@ -195,9 +202,6 @@ namespace ObjCRuntime {
 
 		// TODO: this is necessary whenever we don't statically link the final app (e.g., in debug mode)
 		internal IntPtr LookupUnmanagedFunction(string? entryPoint, int id) => (IntPtr)(-1);
-
-		[DllImport ("/usr/lib/libobjc.dylib", EntryPoint = "objc_msgSend")]
-		public extern static IntPtr IntPtr_objc_msgSend_ref_bool (IntPtr receiver, IntPtr selector, ref bool p1);
 	}
 }
 
