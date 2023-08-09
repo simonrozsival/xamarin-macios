@@ -33,7 +33,7 @@ using Foundation;
 
 namespace AppKit {
 	[Register ("__monomac_internal_ActionDispatcher")]
-	internal class ActionDispatcher : NSObject
+	public partial class ActionDispatcher : NSObject
 #if !__MACCATALYST__
 		, INSMenuValidation // INSMenuValidation needed for using the Activated method of NSMenuItems if you want to be able to validate
 #endif

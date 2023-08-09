@@ -86,7 +86,7 @@ namespace CoreGraphics {
 	[SupportedOSPlatform ("macos")]
 	[SupportedOSPlatform ("tvos")]
 #endif
-	public class CGPath : NativeObject {
+	public partial class CGPath : NativeObject {
 #if !COREBUILD
 		[DllImport (Constants.CoreGraphicsLibrary)]
 		extern static /* CGMutablePathRef */ IntPtr CGPathCreateMutable ();

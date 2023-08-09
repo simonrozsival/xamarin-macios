@@ -17,7 +17,7 @@ using ObjCRuntime;
 
 namespace UIKit {
 	[Register]
-	class UIControlEventProxy : NSObject {
+	public partial class UIControlEventProxy : NSObject {
 		EventHandler eh;
 		UIControl source;
 		internal int Counter = 1;

@@ -31,7 +31,7 @@ namespace Foundation {
 
 #if !COREBUILD
 	// Use this for synchronous operations
-	internal abstract class NSDispatcher : NSObject {
+	public abstract partial class NSDispatcher : NSObject {
 		public const string SelectorName = "xamarinApplySelector";
 		public static readonly Selector Selector = new Selector (SelectorName);
 
@@ -47,7 +47,7 @@ namespace Foundation {
 
 	// Use this for synchronous operations
 	[Register ("__MonoMac_NSActionDispatcher")]
-	internal sealed class NSActionDispatcher : NSDispatcher {
+	public sealed partial class NSActionDispatcher : NSDispatcher {
 		readonly Action action;
 
 		public NSActionDispatcher (Action action)
@@ -63,7 +63,7 @@ namespace Foundation {
 
 	// Use this for synchronous operations
 	[Register ("__MonoMac_NSSynchronizationContextDispatcher")]
-	internal sealed class NSSynchronizationContextDispatcher : NSDispatcher {
+	public sealed partial class NSSynchronizationContextDispatcher : NSDispatcher {
 		readonly SendOrPostCallback d;
 		readonly object state;
 
@@ -81,7 +81,7 @@ namespace Foundation {
 
 	// Used this for NSTimer support
 	[Register ("__Xamarin_NSTimerActionDispatcher")]
-	internal sealed class NSTimerActionDispatcher : NSObject {
+	public sealed partial class NSTimerActionDispatcher : NSObject {
 		public const string SelectorName = "xamarinFireSelector:";
 		public static readonly Selector Selector = new Selector (SelectorName);
 
@@ -104,7 +104,7 @@ namespace Foundation {
 		}
 	}
 
-	abstract class NSAsyncDispatcher : NSDispatcher {
+	public abstract partial class NSAsyncDispatcher : NSDispatcher {
 		readonly GCHandle gch;
 
 		protected NSAsyncDispatcher ()
@@ -133,7 +133,7 @@ namespace Foundation {
 
 	// Use this for asynchronous operations
 	[Register ("__MonoMac_NSAsyncActionDispatcher")]
-	internal sealed class NSAsyncActionDispatcher : NSAsyncDispatcher {
+	public sealed partial class NSAsyncActionDispatcher : NSAsyncDispatcher {
 		Action action;
 
 		public NSAsyncActionDispatcher (Action action)
@@ -157,7 +157,7 @@ namespace Foundation {
 
 	// Use this for asynchronous operations
 	[Register ("__MonoMac_NSAsyncSynchronizationContextDispatcher")]
-	internal sealed class NSAsyncSynchronizationContextDispatcher : NSAsyncDispatcher {
+	public sealed partial class NSAsyncSynchronizationContextDispatcher : NSAsyncDispatcher {
 		SendOrPostCallback d;
 		object state;
 
