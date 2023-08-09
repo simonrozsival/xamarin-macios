@@ -232,6 +232,22 @@ namespace ObjCRuntime {
 			}
 		}
 
+		internal static void ThrowIfManagedStaticRegistrar ([CallerMemberName] string? caller = null)
+		{
+#if NET
+			if (Runtime.IsManagedStaticRegistrar)
+				throw new UnreachableException ($"The method '{caller ?? "<unknown>"}' cannot be called when using the managed static registrar.");
+#endif
+		}
+
+		internal static void ThrowIfNotManagedStaticRegistrar ([CallerMemberName] string? caller = null)
+		{
+#if NET
+			if (!Runtime.IsManagedStaticRegistrar)
+				throw new UnreachableException ($"The method '{caller ?? "<unknown>"}' can only be called when using the managed static registrar.");
+#endif
+		}
+
 		[BindingImpl (BindingImplOptions.Optimizable)]
 		public static bool DynamicRegistrationSupported {
 			get {
@@ -533,16 +549,22 @@ namespace ObjCRuntime {
 
 		static IntPtr GetBlockWrapperCreator (IntPtr method, int parameter)
 		{
+			Runtime.ThrowIfManagedStaticRegistrar ();
+
 			return AllocGCHandle (GetBlockWrapperCreator ((MethodInfo) GetGCHandleTarget (method)!, parameter));
 		}
 
 		static IntPtr CreateBlockProxy (IntPtr method, IntPtr block)
 		{
+			Runtime.ThrowIfManagedStaticRegistrar ();
+
 			return AllocGCHandle (CreateBlockProxy ((MethodInfo) GetGCHandleTarget (method)!, block));
 		}
 
 		static IntPtr CreateDelegateProxy (IntPtr method, IntPtr @delegate, IntPtr signature, uint token_ref)
 		{
+			Runtime.ThrowIfManagedStaticRegistrar ();
+
 			return BlockLiteral.GetBlockForDelegate ((MethodInfo) GetGCHandleTarget (method)!, GetGCHandleTarget (@delegate), token_ref, Marshal.PtrToStringAuto (signature));
 		}
 
@@ -759,13 +781,13 @@ namespace ObjCRuntime {
 		}
 
 #if NET
-		internal static bool HasNSObject (NativeHandle ptr)
+		public static bool HasNSObject (NativeHandle ptr)
 		{
 			return TryGetNSObject (ptr, evenInFinalizerQueue: false) is not null;
 		}
 #endif
 
-		internal static sbyte HasNSObject (IntPtr ptr)
+		public static sbyte HasNSObject (IntPtr ptr)
 		{
 			var rv = TryGetNSObject (ptr, evenInFinalizerQueue: false) is not null;
 			return (sbyte) (rv ? 1 : 0);
@@ -782,7 +804,9 @@ namespace ObjCRuntime {
 		}
 
 		static unsafe IntPtr GetMethodFromToken (uint token_ref)
-		{
+		{	
+			Runtime.ThrowIfManagedStaticRegistrar ();
+
 			var method = Class.ResolveMethodTokenReference (token_ref);
 			if (method is not null)
 				return AllocGCHandle (method);
@@ -792,6 +816,8 @@ namespace ObjCRuntime {
 
 		static unsafe IntPtr GetGenericMethodFromToken (IntPtr obj, uint token_ref)
 		{
+			Runtime.ThrowIfManagedStaticRegistrar ();
+
 			var method = Class.ResolveMethodTokenReference (token_ref);
 			if (method is null)
 				return IntPtr.Zero;
@@ -818,6 +844,8 @@ namespace ObjCRuntime {
 			/*
 			 * This method is called from marshalling bridge (dynamic mode).
 			 */
+			Runtime.ThrowIfManagedStaticRegistrar ();
+
 			var type = (System.Type) GetGCHandleTarget (type_ptr)!;
 			return AllocGCHandle (GetINativeObject (ptr, owns != 0, type, null));
 		}
@@ -827,6 +855,7 @@ namespace ObjCRuntime {
 			/* 
 			 * This method is called from generated code from the static registrar.
 			 */
+			Runtime.ThrowIfManagedStaticRegistrar ();
 
 			var iface = Class.ResolveTypeTokenReference (iface_token)!;
 			var type = Class.ResolveTypeTokenReference (implementation_token);
@@ -1219,7 +1248,7 @@ namespace ObjCRuntime {
 			return null;
 		}
 
-		internal enum MissingCtorResolution {
+		public enum MissingCtorResolution {
 			ThrowConstructor1NotFound,
 			ThrowConstructor2NotFound,
 			Ignore,
@@ -1324,6 +1353,15 @@ namespace ObjCRuntime {
 			if (type is null)
 				throw new ArgumentNullException (nameof (type));
 
+#if NET
+			if (Runtime.IsManagedStaticRegistrar) {
+				var instance = RegistrarHelper.ConstructNSObject<T> (ptr, type);
+				if (instance is null)
+					MissingCtor (ptr, IntPtr.Zero, type, missingCtorResolution, sel, method_handle);
+				return instance;
+			}
+#endif
+
 			var ctor = GetIntPtrConstructor (type);
 
 			if (ctor is null) {
@@ -1353,6 +1391,15 @@ namespace ObjCRuntime {
 
 			if (type.IsByRef)
 				type = type.GetElementType ()!;
+
+#if NET
+			if (Runtime.IsManagedStaticRegistrar) {
+				var instance = RegistrarHelper.ConstructINativeObject<T> (ptr, owns, type);
+				if (instance is null)
+					MissingCtor (ptr, IntPtr.Zero, type, missingCtorResolution, sel, method_handle);
+				return instance;
+			}
+#endif
 
 			var ctor = GetIntPtr_BoolConstructor (type);
 
@@ -1547,7 +1594,7 @@ namespace ObjCRuntime {
 			return GetNSObject<T> (ptr, sel, method_handle, false);
 		}
 
-		static T? GetNSObject<T> (IntPtr ptr, IntPtr sel, RuntimeMethodHandle method_handle, bool evenInFinalizerQueue) where T : NSObject
+		public static T? GetNSObject<T> (IntPtr ptr, IntPtr sel, RuntimeMethodHandle method_handle, bool evenInFinalizerQueue) where T : NSObject
 		{
 			if (ptr == IntPtr.Zero)
 				return null;
@@ -1557,7 +1604,11 @@ namespace ObjCRuntime {
 			// First check if we got an object of the expected type
 			if (obj is T o)
 				return o;
-
+#if NET
+			if (IsManagedStaticRegistrar && typeof (T) != typeof (NSObject)) {
+				RegistrarHelper.EnsureRegistered (typeof (T));
+			}
+#endif
 			// We either didn't find an object, or it was of the wrong type, so we need to create a new instance.
 
 			// Try to get the managed type that correspond to this exact native type
@@ -1640,7 +1691,11 @@ namespace ObjCRuntime {
 				// We found an instance of the wrong type, and we're asked to not return that.
 				// So fall through to create a new instance instead.
 			}
-
+#if NET
+			if (IsManagedStaticRegistrar && target_type != typeof (NSObject)) {
+				RegistrarHelper.EnsureRegistered (target_type);
+			}
+#endif
 			// Try to get the managed type that correspond to this exact native type
 			IntPtr p = Class.GetClassForObject (ptr);
 			// If unknown then we'll get the Class that Lookup to NSObject even if this is not NSObject.
@@ -1675,6 +1730,12 @@ namespace ObjCRuntime {
 				// such a pointer).
 				implementation = target_type;
 			} else {
+#if NET
+				if (IsManagedStaticRegistrar && target_type != typeof (NSObject)) {
+					RegistrarHelper.EnsureRegistered (target_type);
+				}
+#endif
+				
 				// Lookup the ObjC type of the ptr and see if we can use it.
 				var p = Class.GetClassForObject (ptr);
 
@@ -1859,6 +1920,7 @@ namespace ObjCRuntime {
 				throw ErrorHelper.CreateError (99, Xamarin.Bundler.Errors.MX0099 /* Internal error */, "The managed static registrar is only available for .NET");
 #endif
 			} else {
+				
 				unsafe {
 					var map = options->RegistrationMap;
 					if (map is not null) {
@@ -1942,6 +2004,12 @@ namespace ObjCRuntime {
 		[BindingImpl (BindingImplOptions.Optimizable)]
 		static bool SlowIsUserType (IntPtr cls)
 		{
+#if NET
+			if (Runtime.IsManagedStaticRegistrar) {
+				_ = RegistrarHelper.FindType (cls, out var isCustomType);
+				return isCustomType;
+			}
+#endif
 			unsafe {
 				if (options->RegistrationMap is not null && options->RegistrationMap->map_count > 0) {
 					var map = options->RegistrationMap->map;
@@ -2326,7 +2394,7 @@ namespace ObjCRuntime {
 		}
 
 		// Allocate a GCHandle and return the IntPtr to it.
-		internal static IntPtr AllocGCHandle (object? value)
+		public static IntPtr AllocGCHandle (object? value)
 		{
 			return AllocGCHandle (value, GCHandleType.Normal);
 		}

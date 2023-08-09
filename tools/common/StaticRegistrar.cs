@@ -3147,6 +3147,11 @@ namespace Registrar {
 						}
 					}
 				}
+#if NET
+				if (LinkContext.App.Registrar == RegistrarMode.ManagedStatic) {
+					iface.WriteLine ($"+(void*) getDotnetType;");
+				}
+#endif
 				iface.Unindent ();
 				iface.WriteLine ("@end");
 				iface.WriteLine ();
@@ -3184,6 +3189,18 @@ namespace Registrar {
 							}
 						}
 					}
+#if NET
+					if (LinkContext.App.Registrar == RegistrarMode.ManagedStatic) {
+						// +(void*) getDotnetType;
+						sb.WriteLine($"void* callback_{class_name}_GetDotnetType (GCHandle* exception_gchandle);");
+						sb.WriteLine("+(void*) getDotnetType {");
+						sb.WriteLine("GCHandle exception_gchandle = INVALID_GCHANDLE;");
+						sb.WriteLine($"void* rv = callback_{class_name}_GetDotnetType (&exception_gchandle);");
+						sb.WriteLine("xamarin_process_managed_exception_gchandle (exception_gchandle);");
+						sb.WriteLine("return rv;");
+						sb.WriteLine("}");
+					}
+#endif
 					sb.Unindent ();
 					sb.WriteLine ("@end");
 					if (hasClangDiagnostic)
@@ -3297,6 +3314,7 @@ namespace Registrar {
 			sb.WriteLine (map_init.ToString ());
 #if NET
 			if (App.Optimizations.RedirectClassHandles == true) {
+				Console.WriteLine($"Redirecting class handles");
 				var rewriter = new Rewriter (map_dict, GetAssemblies (), LinkContext);
 				var result = rewriter.Process ();
 				if (!string.IsNullOrEmpty (result)) {
@@ -5203,11 +5221,9 @@ namespace Registrar {
 #if NET
 			if (App.Registrar == RegistrarMode.ManagedStatic) {
 				if (implied_type == TokenType.TypeDef && member is TypeDefinition td) {
-					if (App.Configuration.AssemblyTrampolineInfos.TryGetValue (td.Module.Assembly, out var infos) && infos.TryGetRegisteredTypeIndex (td, out var id)) {
-						id = id | (uint) TokenType.TypeDef;
-						return WriteFullTokenReference (member.Module.Assembly, INVALID_TOKEN_REF, member.Module.Name, id, member.FullName, out token_ref, out exception);
-					}
-					throw ErrorHelper.CreateError (99, $"Can't create a token reference to an unregistered type when using the managed static registrar: {member.FullName}");
+					token_ref = 0u;
+					exception = null;
+					return true;
 				}
 				if (implied_type == TokenType.Method) {
 					throw ErrorHelper.CreateError (99, $"Can't create a token reference to a method when using the managed static registrar: {member.FullName}");
@@ -5565,8 +5581,103 @@ namespace Registrar {
 			methods.AppendLine ();
 			methods.AppendLine (sb);
 
-			methods.StringBuilder.AppendLine ("} /* extern \"C\" */");
+#if NET
+			if (LinkContext.App.Registrar == RegistrarMode.ManagedStatic) {
+				// CATEGORIES
+				var categoriesToGenerate = new List<(string, string)>
+				{
+					("NSException", "callback_Foundation_NSException_GetDotnetType"),
+					("UIApplication", "callback_UIKit_UIApplication_GetDotnetType"),
+					// ("UIApplicationDelegate", "callback_UIKit_UIApplicationDelegate_GetDotnetType"),
+					("UIResponder", "callback_UIKit_UIResponder_GetDotnetType"),
+					("UIViewController", "callback_UIKit_UIViewController_GetDotnetType"),
+					("UIView", "callback_UIKit_UIView_GetDotnetType"),
+					("UIControl", "callback_UIKit_UIControl_GetDotnetType"),
+					// ("UIControlEventProxy", "callback_UIKit_UIControlEventProxy_GetDotnetType"),
+					("UIButton", "callback_UIKit_UIButton_GetDotnetType"),
+					("UIScreen", "callback_UIKit_UIScreen_GetDotnetType"),
+					("UIWindow", "callback_UIKit_UIWindow_GetDotnetType"),
+					// ("NSDispatcher", "callback_Foundation_NSDispatcher_GetDotnetType"),
+					// ("NSSynchronizationContextDispatcher", "callback_Foundation_NSSynchronizationContextDispatcher_GetDotnetType"),
+					// ("NSAsyncDispatcher", "callback_Foundation_NSAsyncDispatcher_GetDotnetType"),
+					// ("NSAsyncSynchronizationContextDispatcher", "callback_Foundation_NSAsyncSynchronizationContextDispatcher_GetDotnetType"),
+					("NSRunLoop", "callback_Foundation_NSRunLoop_GetDotnetType"),
+					("NSAutoreleasePool", "callback_Foundation_NSAutoreleasePool_GetDotnetType"),
+					("NSDictionary", "callback_Foundation_NSDictionary_GetDotnetType"),
+					("NSString", "callback_Foundation_NSString_GetDotnetType"),
+					("NSNumber", "callback_Foundation_NSNumber_GetDotnetType"),
+					("NSArray", "callback_Foundation_NSArray_GetDotnetType"),
+					("NSNull", "callback_Foundation_NSNull_GetDotnetType"),
+					// ("CGPath", "callback_CoreGraphics_CGPath_GetDotnetType"), // TODO CGPath is a C struct and I can't add a category for it...
+				};
 
+				foreach (var (className, callback) in categoriesToGenerate) {
+					methods.AppendLine ($"@interface {className} ({className}Category)");
+					// methods.AppendLine ("-(void*) getDotnetType;");
+					methods.AppendLine ("+(void*) getDotnetType;");
+					methods.AppendLine ("@end");
+					methods.AppendLine ($"@implementation {className} ({className}Category)");
+					methods.AppendLine ($"void* {callback} (GCHandle* exception_gchandle);");
+					methods.AppendLine ("+(void*) getDotnetType {");
+					methods.AppendLine ("GCHandle exception_gchandle = INVALID_GCHANDLE;");
+					methods.AppendLine ($"void* rv = {callback} (&exception_gchandle);");
+					methods.AppendLine ("xamarin_process_managed_exception_gchandle (exception_gchandle);");
+					methods.AppendLine ("return rv;");
+					methods.AppendLine ("}");
+					methods.AppendLine ("@end");
+				}
+
+				// the pinvokes for getting the class for managed type
+				var registerCallbacks = new List<string>
+				{
+					"register_MySingleView_AppDelegate",
+					"register_MySingleView_RegistrarTestClass",
+					"register_Microsoft_MacCatalyst__UIKit_UIApplicationDelegate",
+					"register_Foundation_NSException",
+					"register_UIKit_UIApplication",
+					"register_UIKit_UIResponder",
+					"register_UIKit_UIViewController",
+					"register_UIKit_UIView",
+					"register_UIKit_UIControl",
+					"register_UIKit_UIButton",
+					"register_UIKit_UIScreen",
+					"register_UIKit_UIWindow",
+					"register_Foundation_NSArray",
+					"register_Foundation_NSString",
+					"register_Foundation_NSNumber",
+					"register_Foundation_NSRunLoop",
+					"register_Foundation_NSAutoreleasePool",
+					"register_Foundation_NSDictionary",
+					"register_Foundation_NSDispatcher",
+					"register_Foundation_NSSynchronizationContextDispatcher",
+					"register_Foundation_NSAsyncDispatcher",
+					"register_Foundation_NSAsyncSynchronizationContextDispatcher",
+					"register_Foundation_NSObject_Disposer",
+					"register_UIKit_UIControlEventProxy",
+					"register_Foundation_NSNull",
+					"register_CoreGraphics_CGPath",
+				};
+
+				foreach (var cb in registerCallbacks) {
+					methods.AppendLine ($"void {cb} (GCHandle* exception_gchandle);");
+				}
+
+				header.AppendLine ("extern \"C\" {");
+				header.AppendLine ("void initialize_managed_static_registrar ();");
+				header.AppendLine ("} /* extern \"C\" */");
+
+				methods.AppendLine ("void initialize_managed_static_registrar () {");
+				methods.AppendLine ("GCHandle exception_gchandle = INVALID_GCHANDLE;");
+				foreach (var cb in registerCallbacks) {
+					methods.AppendLine ($"{cb} (&exception_gchandle);");
+					methods.AppendLine ("xamarin_process_managed_exception_gchandle (exception_gchandle);");
+					// TODO is this exception handling correct?
+				}
+				methods.AppendLine ("}");
+			}
+#endif
+
+			methods.StringBuilder.AppendLine ("} /* extern \"C\" */");
 			FlushTrace ();
 
 			Driver.WriteIfDifferent (source_path, methods.ToString (), true);
@@ -5574,6 +5685,7 @@ namespace Registrar {
 			header.AppendLine ();
 			header.AppendLine (declarations);
 			header.AppendLine (interfaces);
+
 			Driver.WriteIfDifferent (header_path, header.ToString (), true);
 
 			header.Dispose ();

@@ -377,9 +377,9 @@ namespace Xamarin.Linker {
 			}
 		}
 
-		public TypeReference ObjCRuntime_IManagedRegistrar {
+		public TypeReference ObjCRuntime_ManagedRegistrar {
 			get {
-				return GetTypeReference (PlatformAssembly, "ObjCRuntime.IManagedRegistrar", out var _);
+				return GetTypeReference (PlatformAssembly, "ObjCRuntime.ManagedRegistrar", out var _);
 			}
 		}
 
@@ -712,46 +712,9 @@ namespace Xamarin.Linker {
 			}
 		}
 
-		public MethodReference RegistrarHelper_Register {
+		public MethodReference ManagedRegistrar_RegisterWrapperTypes {
 			get {
-				return GetMethodReference (PlatformAssembly,
-						ObjCRuntime_RegistrarHelper, "Register",
-						isStatic: true,
-						ObjCRuntime_IManagedRegistrar);
-			}
-		}
-
-		public MethodReference IManagedRegistrar_LookupUnmanagedFunction {
-			get {
-				return GetMethodReference (PlatformAssembly,
-						ObjCRuntime_IManagedRegistrar, "LookupUnmanagedFunction",
-						isStatic: false,
-						System_String,
-						System_Int32);
-			}
-		}
-
-		public MethodReference IManagedRegistrar_LookupType {
-			get {
-				return GetMethodReference (PlatformAssembly,
-						ObjCRuntime_IManagedRegistrar, "LookupType",
-						isStatic: false,
-						System_UInt32);
-			}
-		}
-
-		public MethodReference IManagedRegistrar_LookupTypeId {
-			get {
-				return GetMethodReference (PlatformAssembly,
-						ObjCRuntime_IManagedRegistrar, "LookupTypeId",
-						isStatic: false,
-						System_RuntimeTypeHandle);
-			}
-		}
-
-		public MethodReference IManagedRegistrar_RegisterWrapperTypes {
-			get {
-				return GetMethodReference (PlatformAssembly, ObjCRuntime_IManagedRegistrar, "RegisterWrapperTypes", (v) =>
+				return GetMethodReference (PlatformAssembly, ObjCRuntime_ManagedRegistrar, "RegisterWrapperTypes", (v) =>
 						v.HasParameters
 						&& v.Parameters.Count == 1
 						&& v.Parameters [0].ParameterType is GenericInstanceType git && git.ElementType.Is ("System.Collections.Generic", "Dictionary`2")
