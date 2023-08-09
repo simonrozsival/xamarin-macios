@@ -13,10 +13,10 @@ using MySingleView;
 namespace MySingleView
 {
 	static class RegistrarInit {
-		[ModuleInitializer]
-		public static void InitializeManagedStaticRegistrar () {
-			initialize_managed_static_registrar ();
-		}
+		// [ModuleInitializer]
+		// public static void InitializeManagedStaticRegistrar () {
+		// 	initialize_managed_static_registrar ();
+		// }
 
 		[DllImport ("__Internal")]
 		public extern static void initialize_managed_static_registrar ();

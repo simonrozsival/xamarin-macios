@@ -1,3 +1,5 @@
+#define USE_STATIC_CTORS
+
 #if NET
 
 using Foundation;
@@ -205,9 +207,7 @@ namespace Foundation {
 	}
 
 	partial class NSString : IManagedRegistrarType {
-#if USE_STATIC_CTORS
-		static NSString() => RegistrarHelper.Register<NSString> ();
-#endif
+		// NSString already contains a static constructor
 #if __IOS__ || __MACCATALYST__
 		public static NSObject CreateNSObject(NativeHandle handle) => new NSString(handle);
 #endif
