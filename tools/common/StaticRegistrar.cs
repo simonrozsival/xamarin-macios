@@ -3213,10 +3213,10 @@ namespace Registrar {
 #if NET
 					if (LinkContext.App.Registrar == RegistrarMode.ManagedStatic) {
 						// +(void*) getDotnetType;
-						sb.WriteLine($"void* callback_{class_name}_GetDotnetType (GCHandle* exception_gchandle);");
+						sb.WriteLine($"void* callback_{class_name}_$_GetDotnetType (GCHandle* exception_gchandle);");
 						sb.WriteLine("+(void*) getDotnetType {");
 						sb.WriteLine("GCHandle exception_gchandle = INVALID_GCHANDLE;");
-						sb.WriteLine($"void* rv = callback_{class_name}_GetDotnetType (&exception_gchandle);");
+						sb.WriteLine($"void* rv = callback_{class_name}_$_GetDotnetType (&exception_gchandle);");
 						sb.WriteLine("xamarin_process_managed_exception_gchandle (exception_gchandle);");
 						sb.WriteLine("return rv;");
 						sb.WriteLine("}");

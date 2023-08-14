@@ -9,4 +9,13 @@
 		<ApplicationVersion>3.14</ApplicationVersion>
 		<CustomBeforeMicrosoftCommonTargets>$(CustomBeforeMicrosoftCommonTargets);$(MSBuildThisFileDirectory)../../common/SupportedOSPlatformVersions.targets</CustomBeforeMicrosoftCommonTargets>
 	</PropertyGroup>
+	
+	<PropertyGroup>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\..\tools\source-generators\ManagedRegistrarGenerator\ManagedRegistrarGenerator.csproj" />
+	  </ItemGroup>
 </Project>

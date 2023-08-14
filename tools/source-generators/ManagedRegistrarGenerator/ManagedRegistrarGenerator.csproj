@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <RootNamespace>Xamarin.ManagedRegistrarGenerator</RootNamespace> <!-- TODO: name? -->
+    <AnalyzerLanguage>cs</AnalyzerLanguage>
+    <!-- <IsRoslynComponent>true</IsRoslynComponent> --> <!-- TODO: should this be set to true as in ComInterfaceGenerator? -->
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <!-- TODO: this is copied from ComWrapperGenerator, it might not apply for Xamarin -->
+    <!-- Disable RS2008: Enable analyzer release tracking
+          Diagnostics in runtime use a different mechanism (docs/project/list-of-diagnostics.md) -->
+    <NoWarn>RS2008;$(NoWarn)</NoWarn>
+  </PropertyGroup>
+
+  <Import Project="../../../eng/Versions.props" />
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="$(MicrosoftCodeAnalysisAnalyzersVersion)" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="$(MicrosoftCodeAnalysisCsharpVersion)" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

@@ -88,7 +88,7 @@ namespace MySingleView
 
 	public static class AnyT_1__Registrar_Callbacks__
 	{
-		[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_AnyT_1_GetDotnetType")]
+		[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_AnyT_1_$_GetDotnetType")]
 		public unsafe static IntPtr callback_MySingleView_AnyT_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<MySingleView.AnyT<Foundation.NSObject>> (exception_gchandle);
 
@@ -106,7 +106,7 @@ namespace MySingleView
 		public static new NativeHandle GetNativeClass () => Class.GetHandle ("MySingleView_ConformsToProtocolTestClass");
 		public static class __Registrar_Callbacks__
 		{
-			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_ConformsToProtocolTestClass_GetDotnetType")]
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_ConformsToProtocolTestClass_$_GetDotnetType")]
 			public unsafe static IntPtr callback_MySingleView_ConformsToProtocolTestClass_GetDotnetType(IntPtr* exception_gchandle)
 				=> RegistrarHelper.GetDotnetType<MySingleView.ConformsToProtocolTestClass> (exception_gchandle);
 
@@ -142,7 +142,7 @@ namespace MySingleView
 		public static new NativeHandle GetNativeClass () => Class.GetHandle ("MySingleView_Test24970");
 		public static class __Registrar_Callbacks__
 		{
-			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_Test24970_GetDotnetType")]
+			[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_Test24970_$_GetDotnetType")]
 			public unsafe static IntPtr callback_MySingleView_Test24970_GetDotnetType(IntPtr* exception_gchandle)
 				=> RegistrarHelper.GetDotnetType<MySingleView.Test24970> (exception_gchandle);
 
@@ -192,7 +192,7 @@ namespace MySingleView
 
 	public static class ConformsToProtocolTestClass_1__Registrar_Callbacks__
 	{
-		[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_ConformsToProtocolTestClass_1_GetDotnetType")]
+		[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_ConformsToProtocolTestClass_1_$_GetDotnetType")]
 		public unsafe static IntPtr callback_MySingleView_ConformsToProtocolTestClass_1_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<MySingleView.ConformsToProtocolTestClass<Foundation.NSObject>> (exception_gchandle);
 
@@ -212,7 +212,7 @@ namespace MySingleView
 
 	public static class MyProtocolImplementation__Registrar_Callbacks__
 	{
-		[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_MyProtocolImplementation_GetDotnetType")]
+		[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_MyProtocolImplementation_$_GetDotnetType")]
 		public unsafe static IntPtr callback_MySingleView_MyProtocolImplementation_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<MyProtocolImplementation> (exception_gchandle);
 
@@ -752,7 +752,7 @@ namespace MySingleView
 				}
 			}
 
-			[UnmanagedCallersOnly(EntryPoint = "_callback_RegistrarTestClass_GetDotnetType")]
+			[UnmanagedCallersOnly(EntryPoint = "_callback_RegistrarTestClass_$_GetDotnetType")]
 			public static unsafe IntPtr callback_RegistrarTestClass_GetDotnetType(IntPtr* exception_gchandle)
 				=> RegistrarHelper.GetDotnetType<MySingleView.RegistrarTestClass> (exception_gchandle);
 
@@ -802,7 +802,7 @@ namespace ObjCRuntime
 			return default(NativeHandle);
 		}
 
-		[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_AppDelegate_GetDotnetType")]
+		[UnmanagedCallersOnly(EntryPoint = "_callback_MySingleView_AppDelegate_$_GetDotnetType")]
 		public unsafe static IntPtr callback_MySingleView_AppDelegate_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<MySingleView.AppDelegate> (exception_gchandle);
 			
@@ -874,7 +874,7 @@ namespace ObjCRuntime
 			return default(byte);
 		}
 
-		[UnmanagedCallersOnly(EntryPoint = "_callback___monomac_internal_ActionDispatcher_GetDotnetType")]
+		[UnmanagedCallersOnly(EntryPoint = "_callback___monomac_internal_ActionDispatcher_$_GetDotnetType")]
 		public unsafe static IntPtr callback_AppKit_ActionDispatcher_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<AppKit.ActionDispatcher> (exception_gchandle);
 
@@ -906,7 +906,7 @@ namespace ObjCRuntime
 			return default(NativeHandle);
 		}
 
-		[UnmanagedCallersOnly(EntryPoint = "_callback_Microsoft_MacCatalyst__UIKit_UIApplicationDelegate_GetDotnetType")]
+		[UnmanagedCallersOnly(EntryPoint = "_callback_Microsoft_MacCatalyst__UIKit_UIApplicationDelegate_$_GetDotnetType")]
 		public unsafe static IntPtr callback_UIKit_UIApplicationDelegate_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<UIKit.UIApplicationDelegate> (exception_gchandle);
 
@@ -928,7 +928,7 @@ namespace ObjCRuntime
 			}
 		}
 
-		[UnmanagedCallersOnly(EntryPoint = "_callback_UIKit_UIControlEventProxy_GetDotnetType")]
+		[UnmanagedCallersOnly(EntryPoint = "_callback_UIKit_UIControlEventProxy_$_GetDotnetType")]
 		public unsafe static IntPtr callback_UIKit_UIControlEventProxy_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<UIKit.UIControlEventProxy> (exception_gchandle);
 
@@ -970,7 +970,7 @@ namespace ObjCRuntime
 			}
 		}
 
-		[UnmanagedCallersOnly(EntryPoint = "_callback_Foundation_NSDispatcher_GetDotnetType")]
+		[UnmanagedCallersOnly(EntryPoint = "_callback_Foundation_NSDispatcher_$_GetDotnetType")]
 		public unsafe static IntPtr callback_Foundation_NSDispatcher_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<Foundation.NSDispatcher> (exception_gchandle);
 
@@ -1011,7 +1011,7 @@ namespace ObjCRuntime
 			}
 		}
 
-		[UnmanagedCallersOnly(EntryPoint = "_callback_Foundation_NSAsyncDispatcher_GetDotnetType")]
+		[UnmanagedCallersOnly(EntryPoint = "_callback_Foundation_NSAsyncDispatcher_$_GetDotnetType")]
 		public unsafe static IntPtr callback_Foundation_NSAsyncDispatcher_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<Foundation.NSAsyncDispatcher> (exception_gchandle);
 
@@ -1052,7 +1052,7 @@ namespace ObjCRuntime
 			}
 		}
 
-		[UnmanagedCallersOnly(EntryPoint = "_callback___MonoMac_NSAsyncSynchronizationContextDispatcher_GetDotnetType")]
+		[UnmanagedCallersOnly(EntryPoint = "_callback___MonoMac_NSAsyncSynchronizationContextDispatcher_$_GetDotnetType")]
 		public unsafe static IntPtr callback_Foundation_NSAsyncSynchronizationContextDispatcher_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<Foundation.NSAsyncSynchronizationContextDispatcher> (exception_gchandle);
 
@@ -1074,7 +1074,7 @@ namespace ObjCRuntime
 			}
 		}
 
-		[UnmanagedCallersOnly(EntryPoint = "_callback___MonoMac_NSSynchronizationContextDispatcher_GetDotnetType")]
+		[UnmanagedCallersOnly(EntryPoint = "_callback___MonoMac_NSSynchronizationContextDispatcher_$_GetDotnetType")]
 		public unsafe static IntPtr callback_Foundation_NSSynchronizationContextDispatcher_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<Foundation.NSSynchronizationContextDispatcher> (exception_gchandle);
 
@@ -1113,7 +1113,7 @@ namespace ObjCRuntime
 			}
 		}
 
-		[UnmanagedCallersOnly(EntryPoint = "_callback___NSObject_Disposer_GetDotnetType")]
+		[UnmanagedCallersOnly(EntryPoint = "_callback___NSObject_Disposer_$_GetDotnetType")]
 		public unsafe static IntPtr callback_Foundation_NSObject_NSObject_Disposer_GetDotnetType(IntPtr* exception_gchandle)
 			=> RegistrarHelper.GetDotnetType<Foundation.NSObject.NSObject_Disposer> (exception_gchandle);
 
