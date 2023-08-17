@@ -11,11 +11,14 @@
 	</PropertyGroup>
 	
 	<PropertyGroup>
-		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+		<ManagedRegistrarGenerator_NativeCodeOutputDirectory>$(OutDir)\native-code\</ManagedRegistrarGenerator_NativeCodeOutputDirectory>
 	</PropertyGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\..\..\tools\source-generators\ManagedRegistrarGenerator\ManagedRegistrarGenerator.csproj" />
-	  </ItemGroup>
+		<ProjectReference
+			Include="..\..\..\tools\source-generators\ManagedRegistrarGenerator\ManagedRegistrarGenerator.csproj"
+			OutputItemType="Analyzer"
+			ReferenceOutputAssembly="false" />
+	</ItemGroup>
 </Project>

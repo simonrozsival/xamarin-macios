@@ -244,6 +244,20 @@ namespace Foundation {
 			GC.SuppressFinalize (this);
 		}
 
+#if NET
+		[System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("ReflectionAnalysis", "IL2087:UnrecognizedReflectionPattern",
+			MessageId = "We make sure there are hard references to the type's constructor(s) through the UnsafeAccessor " +
+				"and ILC will find it and include it.")]
+		public static T CreateNSObject<T> (IntPtr handle)
+			where T : NSObject
+		{
+			var obj = (T) RuntimeHelpers.GetUninitializedObject (typeof (T));
+			obj.handle = new NativeHandle (handle);
+			obj.flags = Flags.NativeRef;
+			return obj;
+		}
+#endif
+
 		internal static IntPtr CreateNSObject (IntPtr type_gchandle, IntPtr handle, Flags flags)
 		{
 #if NET

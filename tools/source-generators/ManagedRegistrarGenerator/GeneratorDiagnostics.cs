@@ -18,11 +18,11 @@ namespace Xamarin.ManagedRegistrarGenerator
 			new DiagnosticDescriptor(
 				Ids.RequiresAllowUnsafeBlocks,
 				"'RegisterAttribute' and custom NSObject subclasses require unsafe code", // TODO extract resource
-				"'RegisterAttribute' and custom NSObject subclasses require unsafe code. Project must be updated with '&lt;AllowUnsafeBlocks&gt;true&lt;/AllowUnsafeBlocks&gt;'.", // TODO extract resource
+				"'RegisterAttribute' and custom NSObject subclasses require unsafe code. Project must be updated with '<AllowUnsafeBlocks>true</AllowUnsafeBlocks>'.", // TODO extract resource
 				Category,
 				DiagnosticSeverity.Error,
 				isEnabledByDefault: true,
-				description: "'RegisterAttribute' and custom NSObject subclasses require unsafe code. Project must be updated with '&lt;AllowUnsafeBlocks&gt;true&lt;/AllowUnsafeBlocks&gt;'."); // TODO extract resource
+				description: "'RegisterAttribute' and custom NSObject subclasses require unsafe code. Project must be updated with '<AllowUnsafeBlocks>true</AllowUnsafeBlocks>'."); // TODO extract resource
 
 		public static readonly DiagnosticDescriptor InvalidAttributedClassMissingPartialModifier =
 			new DiagnosticDescriptor(

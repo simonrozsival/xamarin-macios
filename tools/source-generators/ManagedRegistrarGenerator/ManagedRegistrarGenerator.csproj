@@ -8,17 +8,23 @@
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <LangVersion>latest</LangVersion>
+    <LangVersion>Latest</LangVersion>
     <!-- TODO: this is copied from ComWrapperGenerator, it might not apply for Xamarin -->
     <!-- Disable RS2008: Enable analyzer release tracking
           Diagnostics in runtime use a different mechanism (docs/project/list-of-diagnostics.md) -->
     <NoWarn>RS2008;$(NoWarn)</NoWarn>
+		<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
   </PropertyGroup>
-
+  
   <Import Project="../../../eng/Versions.props" />
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="$(MicrosoftCodeAnalysisAnalyzersVersion)" PrivateAssets="all" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="$(MicrosoftCodeAnalysisCsharpVersion)" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <None Include="ManagedRegistrarGenerator.props" Pack="true" PackagePath="build" Visible="false" />
   </ItemGroup>
 
 </Project>
