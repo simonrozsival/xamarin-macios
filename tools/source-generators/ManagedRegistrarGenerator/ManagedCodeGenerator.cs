@@ -165,10 +165,11 @@ namespace Xamarin.ManagedRegistrarGenerator
 				return GenerateExportedConstructor(method, memberInfo);
 			}
 
+			var nativeClassName = new NativeClass(_classInfo.Type, _classInfo.Attribute).Name;
 			return CreateUnmanagedCallersOnlyMethod(
 				returnType: GetNativeTypeForManagedType(method.ReturnType),
 				isVoid: method.ReturnsVoid,
-				name: NameMangler.GetRegistrarCallbackIdentifier(_classInfo, memberInfo),
+				name: NameMangler.GetRegistrarCallbackIdentifier(nativeClassName, memberInfo),
 				createParams: () => CloneParameters(method).ToArray(),
 				createBody: () => {
 					// TODO check AssociatedSymbol if it's a property getter/setter and change the impl accordingly
@@ -192,11 +193,13 @@ namespace Xamarin.ManagedRegistrarGenerator
 			=> Block(GenerateCallMethod(IdentifierName(GetFullName(_classInfo.Type)), method));
 
 		private MethodDeclarationSyntax GenerateExportedConstructor(IMethodSymbol method, ExportedMemberInfo memberInfo)
-			=> CreateUnmanagedCallersOnlyMethod(
+		{
+			var nativeClassName = new NativeClass(_classInfo.Type, _classInfo.Attribute).Name;
+			return CreateUnmanagedCallersOnlyMethod(
 					returnType: SpecialTypeToSyntax(SpecialType.System_IntPtr),
 					isVoid: false,
 					isConstructor: true,
-					name: NameMangler.GetRegistrarCallbackIdentifier(_classInfo, memberInfo),
+					name: NameMangler.GetRegistrarCallbackIdentifier(nativeClassName, memberInfo),
 					createParams: () => CloneParameters(method).ToArray(),
 					// if (Runtime.HasNSObject(pobj) != 0)
 					// {
@@ -315,6 +318,7 @@ namespace Xamarin.ManagedRegistrarGenerator
 															IdentifierName(GetFullName(_classInfo.Type))),})))
 										.WithSemicolonToken(
 											Token(SyntaxKind.SemicolonToken))));
+		}
 
 		private MethodDeclarationSyntax CreateUnmanagedCallersOnlyMethod(
 			TypeSyntax returnType,

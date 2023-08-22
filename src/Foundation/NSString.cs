@@ -62,19 +62,8 @@ namespace Foundation {
 		static IntPtr selInitWithCharactersLengthHandle = Selector.GetHandle (selInitWithCharactersLength);
 #endif
 
-		public static readonly NSString Empty;
-
-		static NSString ()
-		{
-#if NET
-			// Static fields are initialized at the begining of the static constructor
-			// when Empty was initialized outside of the static constructor, the regular NSString
-			// constructor ran _before_ the type was registered, which caused app crashes.
-			if (Runtime.IsManagedStaticRegistrar)
-				RegistrarHelper.Register<NSString> ();
-#endif
-			Empty = new NSString (string.Empty);
-		}
+		private static readonly Lazy<NSString> s_empty = new (() => new NSString (string.Empty));
+		public static NSString Empty => s_empty.Value;
 
 		internal NSString (NativeHandle handle, bool owns) : base (handle, owns)
 		{

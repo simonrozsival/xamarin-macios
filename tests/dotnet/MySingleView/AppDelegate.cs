@@ -15,7 +15,14 @@ namespace MySingleView {
 	[Register(IsWrapper = true)]
 	public partial class X : NSObject {
 		[Export("blahWithY:")]
-		public IntPtr Blah(IntPtr y) {
+		public virtual IntPtr Blah(IntPtr y) {
+			// ...
+			return y;
+		}
+	}
+
+	public partial class Y : X {
+		public override IntPtr Blah(IntPtr y) {
 			// ...
 			return y;
 		}
@@ -51,6 +58,11 @@ namespace MySingleView {
 				return 123;
 			}
 
+			[Export("blahWithUIImage:")]
+			public void Blah(UIImage img) {
+				// ...
+			}
+
 			[Export("blahWithBool:")]
 			public bool Blah(bool param) {
 				// ...
@@ -72,6 +84,12 @@ namespace MySingleView {
 			public IntPtr Blah(ref IntPtr y) {
 				// ...
 				return IntPtr.Zero;
+			}
+
+			[Export("initWithCoder:")]
+			public B(NSCoder coder)
+				: base(coder)
+			{
 			}
 
 			// [Export("property")]
