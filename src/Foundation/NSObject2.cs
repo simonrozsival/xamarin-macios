@@ -189,6 +189,7 @@ namespace Foundation {
 
 		bool IsCustomType {
 			get {
+				// TODO this could be overwritten by the generated registrar code
 				var value = (flags & Flags.IsCustomType) == Flags.IsCustomType;
 				if (!value) {
 					value = Class.IsCustomType (GetType ());
@@ -405,7 +406,7 @@ namespace Foundation {
 		void CreateManagedRef (bool retain)
 		{
 			HasManagedRef = true;
-			bool isUserType = Runtime.IsUserType (handle);
+			bool isUserType = Runtime.IsUserType (handle); // TODO why don't we just use `IsCustomType` instance method here?
 			if (isUserType) {
 				var flags = XamarinGCHandleFlags.HasManagedRef | XamarinGCHandleFlags.InitialSet | XamarinGCHandleFlags.WeakGCHandle;
 				var gchandle = GCHandle.Alloc (this, GCHandleType.WeakTrackResurrection);
@@ -424,7 +425,7 @@ namespace Foundation {
 		void ReleaseManagedRef ()
 		{
 			var handle = this.Handle; // Get a copy of the handle, because it will be cleared out when calling Runtime.NativeObjectHasDied, and we still need the handle later.
-			var user_type = Runtime.IsUserType (handle);
+			var user_type = Runtime.IsUserType (handle); // TODO why don't we just use `IsCustomType` instance method here?
 			HasManagedRef = false;
 			if (!user_type) {
 				/* If we're a wrapper type, we need to unregister here, since we won't enter the release trampoline */
@@ -681,6 +682,7 @@ namespace Foundation {
 		private bool AllocIfNeeded ()
 		{
 			if (handle == NativeHandle.Zero) {
+				// TODO here I could call instance protected virtual method `GetClassHandle` and use a generated override for the method
 #if MONOMAC
 				handle = Messaging.IntPtr_objc_msgSend (Class.GetHandle (this.GetType ()), Selector.AllocHandle);
 #else

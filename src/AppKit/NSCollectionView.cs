@@ -12,6 +12,13 @@ namespace AppKit {
 			_RegisterClassForItem (itemClass is null ? IntPtr.Zero : Class.GetHandle (itemClass), identifier);
 		}
 
+		public void RegisterClassForItem<TItem> (string identifier)
+		{
+			// TODO we could use virtual methods on TItem here
+			// in the original method we can't really do that :-/
+			RegisterClassForItem (typeof (TItem), identifier);
+		}
+
 		public void RegisterClassForSupplementaryView (Type viewClass, NSString kind, string identifier)
 		{
 			_RegisterClassForSupplementaryView (viewClass is null ? IntPtr.Zero : Class.GetHandle (viewClass), kind, identifier);

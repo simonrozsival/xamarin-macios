@@ -37,6 +37,14 @@ namespace UIKit {
 			RegisterClassForCellReuse (cellType is null ? IntPtr.Zero : Class.GetHandle (cellType), reuseIdentifier);
 		}
 
+		public void RegisterClassForCellReuse<TCell> (NSString reuseIdentifier)
+			where TCell : NSObject
+		{
+			// TODO we could use virtual methods on TCell here
+			// in the original method we can't really do that :-/
+			RegisterClassForCellReuse (typeof (TCell), reuseIdentifier);
+		}
+
 		public void RegisterClassForCellReuse (Type cellType, string reuseIdentifier)
 		{
 			using (var str = (NSString) reuseIdentifier)

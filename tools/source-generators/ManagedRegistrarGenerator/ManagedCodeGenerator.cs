@@ -23,20 +23,7 @@ namespace Xamarin.ManagedRegistrarGenerator
 		public MemberDeclarationSyntax Generate(CancellationToken cancellationToken)
 		{
 			var classDeclaration = ClassDeclaration(GetName(_classInfo.Type))
-				.AddModifiers(Token(SyntaxKind.PartialKeyword))
-				.AddBaseListTypes(SimpleBaseType(ParseTypeName(TypeNames.ObjCRuntime_IManagedRegistrarType)));
-
-			var staticCtor = _classInfo.Type.Constructors.FirstOrDefault(ctor => ctor.IsStatic);
-			if (staticCtor is not null)
-			{
-				// TODO how to handle the situation when it already has its own static ctor?
-				//       - at that point we should check that it contains the call to `Register`
-				//         and report an error if it doesn't? or just skip it without any analysis?
-			}
-			else
-			{
-				classDeclaration = classDeclaration.AddMembers(GenerateStaticConstructor());
-			}
+				.AddModifiers(Token(SyntaxKind.PartialKeyword));
 
 			if (ShouldGenerateCreateNSObjectFactoryMethod())
 			{
@@ -90,19 +77,7 @@ namespace Xamarin.ManagedRegistrarGenerator
 				.AddMembers(classDeclaration);
 		}
 
-		private MemberDeclarationSyntax GenerateStaticConstructor()
-			=> ConstructorDeclaration(Identifier(_classInfo.Type.Name))
-				.AddModifiers(Token(SyntaxKind.StaticKeyword))
-				.WithBody(
-					Block(
-						ExpressionStatement(
-							InvocationExpression(
-								MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression,
-									ParseTypeName(TypeNames.ObjCRuntime_RegistrarHelper),
-									GenericName("Register")
-										.AddTypeArgumentListArguments(IdentifierName(GetFullName(_classInfo.Type))))))));
-
-		private bool ShouldGenerateCreateNSObjectFactoryMethod()
+		private bool HasNativeHandleConstructor()
 			=> _classInfo.Type.GetMembers()
 				.Where(member => member is IMethodSymbol)
 				.Cast<IMethodSymbol>()
@@ -114,7 +89,7 @@ namespace Xamarin.ManagedRegistrarGenerator
 					&& method.Parameters[0].Type.ContainingNamespace.Name == "ObjCRuntime"
 					&& method.Parameters[0].Type.ContainingType is null);
 
-		private bool ShouldGenerateCreateINativeObjectFactoryMethod()
+		private bool HasINativeObjectConstructor()
 			=> _classInfo.Type.GetMembers()
 				.Where(member => member is IMethodSymbol)
 				.Cast<IMethodSymbol>()
@@ -139,6 +114,7 @@ namespace Xamarin.ManagedRegistrarGenerator
 					Token(SyntaxKind.PrivateKeyword),
 					Token(SyntaxKind.StaticKeyword))
 				.AddMembers(GenerateGetDotnetType())
+				.AddMembers(GenerateCreateManagedInstance())
 				.AddMembers(GenerateExportedMethodCallbacks());
 
 		private MethodDeclarationSyntax GenerateGetDotnetType()
@@ -153,6 +129,76 @@ namespace Xamarin.ManagedRegistrarGenerator
 						ReturnStatement(
 							RuntimeAllocGCHandleExpression(
 								TypeOfExpression(IdentifierName(GetFullName(_classInfo.Type)))))));
+
+		private MethodDeclarationSyntax GenerateGetDotnetType()
+			=> CreateUnmanagedCallersOnlyMethod(
+				returnType: SpecialTypeToSyntax(SpecialType.System_IntPtr),
+				isVoid: false,
+				name: "CreateManagedInstance",
+				// TODO for generic types we need to change `typeof(T)` to `typeof(T<,,,>)`
+				createBody: () =>
+				{
+					if (_classInfo.Type.IsGenericType) {
+						return ThrowStatement(
+							ObjectCreationExpression(
+								IdentifierName("global::System.NotSupportedException"))
+							.WithArgumentList(
+								ArgumentList(
+									SingletonSeparatedList<ArgumentSyntax>(
+										Argument(
+											LiteralExpression(
+												SyntaxKind.StringLiteralExpression,
+												Literal("Generic types cannot be instantiated from native code")))))));
+					}
+
+					if (HasNativeHandleConstructor()) {
+						return Block(
+							ReturnStatement(
+								RuntimeAllocGCHandleExpression(
+									ObjectCreationExpression(
+										IdentifierName(GetFullName(_classInfo.Type)))
+									.WithArgumentList(
+										ArgumentList(
+											SingletonSeparatedList<ArgumentSyntax>(
+												Argument(
+													IdentifierName("nativeHandle"))))))));
+					}
+
+					if (HasINativeObjectConstructor()) {
+						return Block(
+							ReturnStatement(
+								RuntimeAllocGCHandleExpression(
+									ObjectCreationExpression(
+										IdentifierName(GetFullName(_classInfo.Type)))
+									.WithArgumentList(
+										ArgumentList(
+											SeparatedList<ArgumentSyntax>(
+												new SyntaxNodeOrToken[]{
+													Argument(
+														IdentifierName("nativeHandle")),
+													Token(SyntaxKind.CommaToken),
+													Argument(
+														IdentifierName("owns"))}))))));
+					}
+
+					return ThrowStatement(
+						ObjectCreationExpression(
+							IdentifierName("global::System.NotSupportedException"))
+						.WithArgumentList(
+							ArgumentList(
+								SingletonSeparatedList<ArgumentSyntax>(
+									Argument(
+										LiteralExpression(
+											SyntaxKind.StringLiteralExpression,
+											Literal($"Type {_classInfo.Type.Namespace}.{_classInfo.Type.Name} does not have a suitable constructor to be instantiated from native code")))))));
+				});
+
+		private static string GenerateTypeOfExpression(INamedTypeSymbol type)
+			=> TypeOfExpression(
+				IdentifierName(
+					_classInfo.Type.IsGenericType
+						? GetFullName(_classInfo.Type)
+						: $"{GetFullName(_classInfo.Type)}<{new string(',', _classInfo.Type.TypeArguments.Count - 1)}>"));
 
 		private MemberDeclarationSyntax[] GenerateExportedMethodCallbacks()
 			=> _classInfo.ExportedMembers.Select(GenerateExportedMethodCallback).ToArray();
@@ -215,21 +261,7 @@ namespace Xamarin.ManagedRegistrarGenerator
 						Block(
 							// if (Runtime.HasNSObject(pobj) != 0)
 							IfStatement(
-								BinaryExpression(
-									SyntaxKind.NotEqualsExpression,
-									InvocationExpression(
-										MemberAccessExpression(
-											SyntaxKind.SimpleMemberAccessExpression,
-											IdentifierName("global::ObjCRuntime.Runtime"),
-											IdentifierName("HasNSObject")))
-									.WithArgumentList(
-										ArgumentList(
-											SingletonSeparatedList<ArgumentSyntax>(
-												Argument(
-													IdentifierName("pobj"))))),
-									LiteralExpression(
-										SyntaxKind.NumericLiteralExpression,
-										Literal(0))),
+								ParseExpression("global::ObjCRuntime.Runtime.HasNSObject(pobj) != 0"),
 								Block(
 									ExpressionStatement(
 										AssignmentExpression(
@@ -264,17 +296,7 @@ namespace Xamarin.ManagedRegistrarGenerator
 														IdentifierName("obj")))))),
 
 								// return NativeObjectExtensions.GetHandle(obj);
-								ReturnStatement(
-									InvocationExpression(
-										MemberAccessExpression(
-											SyntaxKind.SimpleMemberAccessExpression,
-											IdentifierName("global::ObjCRuntime.NativeObjectExtensions"),
-											IdentifierName("GetHandle")))
-									.WithArgumentList(
-										ArgumentList(
-											SingletonSeparatedList<ArgumentSyntax>(
-												Argument(
-													IdentifierName("obj")))))),
+								ParseStatement($"return global::ObjCRuntime.NativeObjectExtensions.GetHandle(obj);"),
 
 								// [UnsafeAccessor(UnsafeAccessorKind.Method, Name = ".ctor")]
 								// extern static void ctor(T @this, T0 p0, ...);
@@ -368,7 +390,7 @@ namespace Xamarin.ManagedRegistrarGenerator
 										Block(
 											// *exception_gchandle = Runtime.AllocGCHandle(ex);
 											ParseStatement("*exception_gchandle = global::ObjCRuntime.Runtime.AllocGCHandle(ex);"),
-											// return; or return default;
+											// return default;
 											ReturnStatement(isVoid ? null : ParseExpression("default")))))));
 
 		private static IEnumerable<ParameterSyntax> CloneParameters(IMethodSymbol method)

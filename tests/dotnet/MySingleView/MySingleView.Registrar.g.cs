@@ -28,18 +28,6 @@ namespace MySingleView
 // 		// e.g. MessageSummaryView has a static ctor
 // 		// BUT: - we need to make this specific to the ManagedStaticRegistrar
 
-// 		// static ManagedStaticRegistrar() {
-// 		// 	// ... existing code
-// 		// 	// ...
-
-// 		// 	if (Runtime.IsManagedStaticRegistrar) {
-// 		// 		var instance = RegistrarHelper.Register<T> ();
-// 		// 	}
-// 		// }
-
-// #if USE_STATIC_CTORS
-// 		static AppDelegate() => RegistrarHelper.Register<AppDelegate> ();
-// #endif
 // 		public static new bool IsCustomType => true;
 // 		public static new NativeHandle GetNativeClass () => Class.GetHandle ("MySingleView_AppDelegate");
 // 		public static new Foundation.NSObject CreateNSObject (NativeHandle handle) => new AppDelegate (handle);

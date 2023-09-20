@@ -893,6 +893,8 @@ namespace ObjCRuntime {
 
 		unsafe static IntPtr GetNSObjectWithType (IntPtr ptr, IntPtr type_ptr, int* createdPtr)
 		{
+			ThrowIfManagedStaticRegistrar ();
+
 			var type = (System.Type) GetGCHandleTarget (type_ptr)!;
 			var rv = AllocGCHandle (GetNSObject (ptr, type, MissingCtorResolution.ThrowConstructor1NotFound, true, true, out var created));
 			*createdPtr = created ? 1 : 0;
@@ -1347,26 +1349,6 @@ namespace ObjCRuntime {
 			throw ErrorHelper.CreateError (8027, msg.ToString ());
 		}
 
-#if NET
-		static void CannotCreateManagedInstanceOfGenericType (IntPtr ptr, IntPtr klass, Type type, MissingCtorResolution resolution, IntPtr sel, RuntimeMethodHandle method_handle)
-		{
-			if (resolution == MissingCtorResolution.Ignore)
-				return;
-
-			if (klass == IntPtr.Zero)
-				klass = Class.GetClassForObject (ptr);
-
-			var msg = new StringBuilder ();
-			msg.AppendFormat (Xamarin.Bundler.Errors.MX8056 /* Failed to marshal the Objective-C object 0x{0} (type: {1}). Could not find an existing managed instance for this object, nor was it possible to create a new managed instance of generic type {2}. */, ptr.ToString ("x"), new Class (klass).Name, type.FullName);
-
-			if (sel != IntPtr.Zero || method_handle.Value != IntPtr.Zero) {
-				AppendAdditionalInformation (msg, sel, method_handle);
-			}
-
-			throw ErrorHelper.CreateError (8056, msg.ToString ());
-		}
-#endif
-
 		static void AppendAdditionalInformation (StringBuilder msg, IntPtr sel, RuntimeMethodHandle method_handle)
 		{
 			msg.AppendLine ();
@@ -1402,6 +1384,8 @@ namespace ObjCRuntime {
 
 		static NSObject? ConstructNSObject (IntPtr ptr, IntPtr klass, MissingCtorResolution missingCtorResolution)
 		{
+			ThrowIfManagedStaticRegistrar ();
+
 			Type type = Class.Lookup (klass);
 
 			if (type is not null) {
@@ -1413,12 +1397,16 @@ namespace ObjCRuntime {
 
 		internal static T? ConstructNSObject<T> (IntPtr ptr) where T : NSObject
 		{
+			ThrowIfManagedStaticRegistrar ();
+
 			return ConstructNSObject<T> (ptr, typeof (T), MissingCtorResolution.ThrowConstructor1NotFound);
 		}
 
 		// The 'selector' and 'method' arguments are only used in error messages.
 		static T? ConstructNSObject<T> (IntPtr ptr, Type type, MissingCtorResolution missingCtorResolution) where T : NSObject
 		{
+			ThrowIfManagedStaticRegistrar ();
+
 			return ConstructNSObject<T> (ptr, type, missingCtorResolution, IntPtr.Zero, default (RuntimeMethodHandle));
 		}
 
@@ -1429,25 +1417,10 @@ namespace ObjCRuntime {
 		static T? ConstructNSObject<T> (IntPtr ptr, Type type, MissingCtorResolution missingCtorResolution, IntPtr sel, RuntimeMethodHandle method_handle) where T : class, INativeObject
 #endif
 		{
+			ThrowIfManagedStaticRegistrar ();
+
 			if (type is null)
 				throw new ArgumentNullException (nameof (type));
-#if NET
-			if (Runtime.IsManagedStaticRegistrar) {
-				var instance = RegistrarHelper.ConstructNSObject<T> (type, ptr);
-				if (instance is null)
-					MissingCtor (ptr, IntPtr.Zero, type, missingCtorResolution, sel, method_handle);
-				return instance;
-			}
-#endif
-
-#if NET
-			if (Runtime.IsManagedStaticRegistrar) {
-				var instance = RegistrarHelper.ConstructNSObject<T> (ptr, type);
-				if (instance is null)
-					MissingCtor (ptr, IntPtr.Zero, type, missingCtorResolution, sel, method_handle);
-				return instance;
-			}
-#endif
 
 			var ctor = GetIntPtrConstructor (type);
 
@@ -1473,20 +1446,13 @@ namespace ObjCRuntime {
 		// The generic argument T is only used to cast the return value.
 		static T? ConstructINativeObject<T> (IntPtr ptr, bool owns, Type type, MissingCtorResolution missingCtorResolution, IntPtr sel, RuntimeMethodHandle method_handle) where T : class, INativeObject
 		{
+			ThrowIfManagedStaticRegistrar ();
+
 			if (type is null)
 				throw new ArgumentNullException (nameof (type));
 
 			if (type.IsByRef)
 				type = type.GetElementType ()!;
-
-#if NET
-			if (Runtime.IsManagedStaticRegistrar) {
-				var instance = RegistrarHelper.ConstructINativeObject<T> (type, ptr, owns);
-				if (instance is null)
-					MissingCtor (ptr, IntPtr.Zero, type, missingCtorResolution, sel, method_handle);
-				return instance;
-			}
-#endif
 
 			var ctor = GetIntPtr_BoolConstructor (type);
 
@@ -1657,19 +1623,88 @@ namespace ObjCRuntime {
 		}
 
 #if NET
+		// TODO ideally we would split this into the file for "legacy" registrars and for managed registrar
+
+		public static T GetOrCreateNSObject<T> (NativeHandle ptr, Func<NativeHandle, T> createNSObject, bool evenInFinalizerQueue = false)
+			where T : NSObject
+		{
+			return TryGetNSObject (ptr, evenInFinalizerQueue) as T
+				?? createNSObject (ptr);
+		}
+
+		public static T GetNSObjectOrThrow<T> (NativeHandle ptr, bool evenInFinalizerQueue = false)
+			where T : NSObject
+		{
+			if (TryGetNSObject (ptr, evenInFinalizerQueue) is T o)
+				return o;
+
+			// TODO throw an exception with diagnostic information
+			throw new InvalidOperationException ();
+		}
+
+		public static T GetOrCreateINativeObject<T> (NativeHandle ptr, bool owns, Func<NativeHandle, bool, T> createINativeObject, bool forcedType = false)
+			where T : INativeObject
+		{
+			return TryGetINativeObject<T> (ptr, owns, forcedType)
+				?? createINativeObject (ptr, owns);
+		}
+
+		public static T GetINativeObjectOrThrow<T> (NativeHandle ptr, bool owns, bool forcedType = false)
+			where T : INativeObject
+		{
+			if (TryGetINativeObject<T> (ptr, owns, forcedType) is T o)
+				return o;
+
+			// TODO throw an exception with diagnostic information
+			throw new InvalidOperationException ();
+		}
+
+		private static T? TryGetINativeObject<T> (NativeHandle ptr, bool owns, bool forcedType)
+			where T : INativeObject
+		{
+			var o = TryGetNSObject (ptr, evenInFinalizerQueue: false);
+			if (o is T t) {
+				// found an existing object with the right type.
+				if (owns)
+					TryReleaseINativeObject (t);
+				return t;
+			}
+
+			// If forced type is true, we ignore any existing instances if the managed type of the existing instance isn't compatible with T.
+			// This may end up creating multiple managed wrapper instances for the same native handle,
+			// which is not optimal, but sometimes the alternative can be worse :/
+			if (o is not null && !forcedType) {
+				// found an existing object, but with an incompatible type.
+				if (!typeof (T).IsInterface && typeof (NSObject).IsAssignableFrom (typeof (T))) {
+					// if the target type is another NSObject subclass, there's nothing we can do.
+					throw new InvalidCastException ($"Unable to cast object of type '{o.GetType ().FullName}' to type '{typeof (T).FullName}'.");
+				}
+			}
+
+			return null;
+		}
+#endif
+
+#if NET
 		public static NSObject? GetNSObject (NativeHandle ptr)
 		{
+			ThrowIfManagedStaticRegistrar ();
+
 			return GetNSObject ((IntPtr) ptr, MissingCtorResolution.ThrowConstructor1NotFound);
 		}
 #endif
 
 		public static NSObject? GetNSObject (IntPtr ptr)
 		{
+			ThrowIfManagedStaticRegistrar ();
+
 			return GetNSObject (ptr, MissingCtorResolution.ThrowConstructor1NotFound);
 		}
 
 		internal static NSObject? GetNSObject (IntPtr ptr, MissingCtorResolution missingCtorResolution, bool evenInFinalizerQueue = false)
 		{
+			ThrowIfManagedStaticRegistrar ();
+
 			if (ptr == IntPtr.Zero)
 				return null;
 
@@ -1683,16 +1718,22 @@ namespace ObjCRuntime {
 
 		static public T? GetNSObject<T> (IntPtr ptr) where T : NSObject
 		{
+			ThrowIfManagedStaticRegistrar ();
+
 			return GetNSObject<T> (ptr, IntPtr.Zero, default (RuntimeMethodHandle));
 		}
 
 		static T? GetNSObject<T> (IntPtr ptr, IntPtr sel, RuntimeMethodHandle method_handle) where T : NSObject
 		{
+			ThrowIfManagedStaticRegistrar ();
+
 			return GetNSObject<T> (ptr, sel, method_handle, false);
 		}
 
 		public static T? GetNSObject<T> (IntPtr ptr, IntPtr sel, RuntimeMethodHandle method_handle, bool evenInFinalizerQueue) where T : NSObject
 		{
+			ThrowIfManagedStaticRegistrar ();
+
 			if (ptr == IntPtr.Zero)
 				return null;
 
@@ -1701,11 +1742,7 @@ namespace ObjCRuntime {
 			// First check if we got an object of the expected type
 			if (obj is T o)
 				return o;
-#if NET
-			if (IsManagedStaticRegistrar && typeof (T) != typeof (NSObject)) {
-				RegistrarHelper.EnsureRegistered (typeof (T));
-			}
-#endif
+
 			// We either didn't find an object, or it was of the wrong type, so we need to create a new instance.
 
 			// Try to get the managed type that correspond to this exact native type
@@ -1735,6 +1772,8 @@ namespace ObjCRuntime {
 
 		static public T? GetNSObject<T> (IntPtr ptr, bool owns) where T : NSObject
 		{
+			ThrowIfManagedStaticRegistrar ();
+
 			var obj = GetNSObject<T> (ptr);
 			if (owns)
 				obj?.DangerousRelease ();
@@ -1763,6 +1802,8 @@ namespace ObjCRuntime {
 		// The 'selector' and 'method' arguments are only used in error messages.
 		static NSObject? GetNSObject (IntPtr ptr, Type target_type, MissingCtorResolution missingCtorResolution, bool evenInFinalizerQueue, bool createNewInstanceIfWrongType, out bool created)
 		{
+			ThrowIfManagedStaticRegistrar ();
+
 			created = false;
 
 			if (ptr == IntPtr.Zero)
@@ -1788,11 +1829,7 @@ namespace ObjCRuntime {
 				// We found an instance of the wrong type, and we're asked to not return that.
 				// So fall through to create a new instance instead.
 			}
-#if NET
-			if (IsManagedStaticRegistrar && target_type != typeof (NSObject)) {
-				RegistrarHelper.EnsureRegistered (target_type);
-			}
-#endif
+
 			// Try to get the managed type that correspond to this exact native type
 			IntPtr p = Class.GetClassForObject (ptr);
 			// If unknown then we'll get the Class that Lookup to NSObject even if this is not NSObject.
@@ -1819,6 +1856,8 @@ namespace ObjCRuntime {
 
 		static Type LookupINativeObjectImplementation (IntPtr ptr, Type target_type, Type? implementation = null, bool forced_type = false)
 		{
+			ThrowIfManagedStaticRegistrar ();
+
 			if (!typeof (NSObject).IsAssignableFrom (target_type)) {
 				// If we're not expecting an NSObject, we can't do a dynamic lookup of the type of ptr,
 				// since we do not know if the object actually supports dynamic type lookup (it can be an
@@ -1827,12 +1866,6 @@ namespace ObjCRuntime {
 				// such a pointer).
 				implementation = target_type;
 			} else {
-#if NET
-				if (IsManagedStaticRegistrar && target_type != typeof (NSObject)) {
-					RegistrarHelper.EnsureRegistered (target_type);
-				}
-#endif
-				
 				// Lookup the ObjC type of the ptr and see if we can use it.
 				var p = Class.GetClassForObject (ptr);
 
@@ -1866,18 +1899,24 @@ namespace ObjCRuntime {
 
 		public static INativeObject? GetINativeObject (IntPtr ptr, bool owns, Type target_type)
 		{
+			ThrowIfManagedStaticRegistrar ();
+
 			return GetINativeObject (ptr, owns, target_type, null);
 		}
 
 		// this method is identical in behavior to the generic one.
 		static INativeObject? GetINativeObject (IntPtr ptr, bool owns, Type target_type, Type? implementation)
 		{
+			ThrowIfManagedStaticRegistrar ();
+
 			return GetINativeObject (ptr, owns, target_type, implementation, IntPtr.Zero, default (RuntimeMethodHandle));
 		}
 
 		// this method is identical in behavior to the generic one.
 		static INativeObject? GetINativeObject (IntPtr ptr, bool owns, Type target_type, Type? implementation, IntPtr sel, RuntimeMethodHandle method_handle)
 		{
+			ThrowIfManagedStaticRegistrar ();
+
 			if (ptr == IntPtr.Zero)
 				return null;
 
@@ -1920,21 +1959,29 @@ namespace ObjCRuntime {
 		// this method is identical in behavior to the non-generic one.
 		public static T? GetINativeObject<T> (IntPtr ptr, bool owns) where T : class, INativeObject
 		{
+			ThrowIfManagedStaticRegistrar ();
+
 			return GetINativeObject<T> (ptr, false, owns);
 		}
 
 		public static T? GetINativeObject<T> (IntPtr ptr, bool forced_type, bool owns) where T : class, INativeObject
 		{
+			ThrowIfManagedStaticRegistrar ();
+
 			return GetINativeObject<T> (ptr, forced_type, null, owns);
 		}
 
 		internal static T? GetINativeObject<T> (IntPtr ptr, bool forced_type, Type? implementation, bool owns) where T : class, INativeObject
 		{
+			ThrowIfManagedStaticRegistrar ();
+
 			return GetINativeObject<T> (ptr, forced_type, implementation, owns, IntPtr.Zero, default (RuntimeMethodHandle));
 		}
 
 		static T? GetINativeObject<T> (IntPtr ptr, bool forced_type, Type? implementation, bool owns, IntPtr sel, RuntimeMethodHandle method_handle) where T : class, INativeObject
 		{
+			ThrowIfManagedStaticRegistrar ();
+
 			if (ptr == IntPtr.Zero)
 				return null;
 
@@ -1969,17 +2016,10 @@ namespace ObjCRuntime {
 					throw ErrorHelper.CreateError (8004, $"Cannot create an instance of {implementation.FullName} for the native object 0x{ptr:x} (of type '{Class.class_getName (Class.GetClassForObject (ptr))}'), because another instance already exists for this native object (of type {o.GetType ().FullName}).");
 				}
 #if NET
-				if (!Runtime.IsManagedStaticRegistrar) {
-					// For other registrars other than managed-static the generic parameter of ConstructNSObject is used
-					// only to cast the return value so we can safely pass NSObject here to satisfy the constraints of the
-					// generic parameter.
-					var rv = (T?)(INativeObject?) ConstructNSObject<NSObject> (ptr, implementation, MissingCtorResolution.ThrowConstructor1NotFound, sel, method_handle);
-					if (owns)
-						TryReleaseINativeObject (rv);
-					return rv;
-				}
-#else
-				var rv = ConstructNSObject<T> (ptr, implementation, MissingCtorResolution.ThrowConstructor1NotFound, sel, method_handle);
+				// For other registrars other than managed-static the generic parameter of ConstructNSObject is used
+				// only to cast the return value so we can safely pass NSObject here to satisfy the constraints of the
+				// generic parameter.
+				var rv = (T?)(INativeObject?) ConstructNSObject<NSObject> (ptr, implementation, MissingCtorResolution.ThrowConstructor1NotFound, sel, method_handle);
 				if (owns)
 					TryReleaseINativeObject (rv);
 				return rv;
@@ -2009,6 +2049,8 @@ namespace ObjCRuntime {
 
 		static Type? FindProtocolWrapperType (Type? type)
 		{
+			ThrowIfManagedStaticRegistrar ();
+
 			if (type is null)
 				return null;
 #if NET
@@ -2020,25 +2062,14 @@ namespace ObjCRuntime {
 				return null;
 
 			// Check if the static registrar knows about this protocol
-			if (IsManagedStaticRegistrar) {
-#if NET
-				var rv = RegistrarHelper.FindProtocolWrapperType (type);
-				if (rv is not null)
-					return rv;
-#else
-				throw ErrorHelper.CreateError (99, Xamarin.Bundler.Errors.MX0099 /* Internal error */, "The managed static registrar is only available for .NET");
-#endif
-			} else {
-				
-				unsafe {
-					var map = options->RegistrationMap;
-					if (map is not null) {
-						var token = Class.GetTokenReference (type, throw_exception: false);
-						if (token != INVALID_TOKEN_REF) {
-							var wrapper_token = xamarin_find_protocol_wrapper_type (token);
-							if (wrapper_token != INVALID_TOKEN_REF)
-								return Class.ResolveTypeTokenReference (wrapper_token);
-						}
+			unsafe {
+				var map = options->RegistrationMap;
+				if (map is not null) {
+					var token = Class.GetTokenReference (type, throw_exception: false);
+					if (token != INVALID_TOKEN_REF) {
+						var wrapper_token = xamarin_find_protocol_wrapper_type (token);
+						if (wrapper_token != INVALID_TOKEN_REF)
+							return Class.ResolveTypeTokenReference (wrapper_token);
 					}
 				}
 			}
@@ -2091,6 +2122,7 @@ namespace ObjCRuntime {
 		internal static bool IsUserType (IntPtr self)
 		{
 			var cls = Class.object_getClass (self);
+			// TODO we could just try sending a message to `self` and see if it responds to `isCustomType` or something
 			lock (usertype_cache) {
 #if NET
 				ref var result = ref CollectionsMarshal.GetValueRefOrAddDefault (usertype_cache, cls, out var exists);
@@ -2609,11 +2641,7 @@ namespace ObjCRuntime {
 
 		static IntPtr LookupUnmanagedFunction (IntPtr assembly, IntPtr symbol, int id)
 		{
-#if NET
-			return RegistrarHelper.LookupUnmanagedFunction (assembly, Marshal.PtrToStringAuto (symbol), id);
-#else
 			return IntPtr.Zero;
-#endif
 		}
 	}
 

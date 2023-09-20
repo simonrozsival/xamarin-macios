@@ -38,17 +38,6 @@ namespace ObjCRuntime {
 	// This class contains helper methods for the managed static registrar.
 	// The managed static registrar will make it public when needed.
 	public static class RegistrarHelper {
-		class MapInfo {
-			public ManagedRegistrar Registrar;
-			public HashSet<RuntimeTypeHandle> RegisteredWrapperTypes;
-
-			public MapInfo (RuntimeTypeHandleEqualityComparer comparer)
-			{
-				Registrar = new (comparer);
-				RegisteredWrapperTypes = new (comparer);
-			}
-		}
-
 		// Ignore CS8618 for these two variables:
 		//     Non-nullable variable must contain a non-null value when exiting constructor.
 		// Because we won't use a static constructor to initialize them, instead we're using a module initializer,
@@ -116,156 +105,15 @@ namespace ObjCRuntime {
 			}
 		}
 
-		public static void Register<T> ()
-			where T : IManagedRegistrarType
-		{
-			Runtime.ThrowIfNotManagedStaticRegistrar ();
-#if TRACE
-			Console.WriteLine($"RegistrarHelper: Register {typeof(T)}, {typeof (T).Assembly}");
-#endif
-			var map = GetOrInitMapEntry (typeof (T).Assembly);
-			map.Registrar.Register<T> ();
-		}
-
-		// TODO revisit this later
-		internal static Type? FindProtocolWrapperType (Type type)
-		{
-#if TRACE
-			Runtime.NSLog ($"RegistrarHelper: FindProtocolWrapperType(type: {type})");
-#endif
-			// First check if the type is already in our dictionary.
-			if (wrapper_types.TryGetValue (type.TypeHandle, out var wrapperType))
-				return Type.GetTypeFromHandle (wrapperType);
-
-			// Not in our dictionary, get the map entry to see if we've already
-			// called RegisterWrapperType for this assembly,
-			var map = GetOrInitMapEntry (type.Assembly);
-			if (!map.RegisteredWrapperTypes.Contains (type.TypeHandle)) {
-				map.Registrar.RegisterWrapperType (type.TypeHandle, wrapper_types);
-				map.RegisteredWrapperTypes.Add (type.TypeHandle);
-			}
-
-			// Return whatever's in the dictionary now.
-			if (wrapper_types.TryGetValue (type.TypeHandle, out wrapperType))
-				return Type.GetTypeFromHandle (wrapperType);
-
-			return null;
-		}
-
-#if TRACE
-		[ThreadStatic]
-		static Stopwatch? lookupWatch;
-#endif
-
-		internal static IntPtr LookupUnmanagedFunction (IntPtr assembly, string? symbol, int id)
-		{
-			IntPtr rv;
-
-#if TRACE
-			if (lookupWatch is null)
-				lookupWatch = new Stopwatch ();
-
-			lookupWatch.Start ();
-			Console.WriteLine ("LookupUnmanagedFunction (0x{0} = {1}, {2}, {3})", assembly.ToString ("x"), Marshal.PtrToStringAuto (assembly), symbol, id);
-#endif
-
-			if (id == -1) {
-				rv = IntPtr.Zero;
-			} else {
-				rv = LookupUnmanagedFunctionInAssembly (assembly, symbol, id);
-			}
-
-#if TRACE
-			lookupWatch.Stop ();
-
-			Console.WriteLine ("LookupUnmanagedFunction (0x{0} = {1}, {2}, {3}) => 0x{4} ElapsedMilliseconds: {5}", assembly.ToString ("x"), Marshal.PtrToStringAuto (assembly), symbol, id, rv.ToString ("x"), lookupWatch.ElapsedMilliseconds);
-#endif
-
-			if (rv != IntPtr.Zero)
-				return rv;
-
-			throw ErrorHelper.CreateError (8001, "Unable to find the managed function with id {0} ({1})", id, symbol);
-		}
-
-		static IntPtr LookupUnmanagedFunctionInAssembly (IntPtr assembly_name, string? symbol, int id)
-		{
-			throw new NotImplementedException ("TODO: Looking up unmanaged functions isn't in the scope of this experiment.");
-		}
-
-		internal static void EnsureRegistered (Type type)
-		{
-			var map = GetOrInitMapEntry (type.Assembly);
-			map.Registrar.EnsureRegistered (type.TypeHandle);
-		}
-
 		internal static bool IsCustomType (Type type)
 		{
-			var map = GetOrInitMapEntry (type.Assembly);
-			return map.Registrar.IsCustomType (type);
+			_ = FindClass (type, out bool isCustomType);
+			return isCustomType;
 		}
 
 		internal static IntPtr FindClass (Type type, out bool isCustomType)
 		{
-			var map = GetOrInitMapEntry (type.Assembly);
-			isCustomType = map.Registrar.IsCustomType (type);
-			return map.Registrar.FindClass (type);
-		}
-
-		internal static Type? FindType (NativeHandle @class, out bool isCustomType)
-		{
-#if TRACE
-			Runtime.NSLog ($"RegistrarHelper: FindType(@class: {@class})");
-#endif
-			var type = ManagedRegistrar.FindType (@class);
-			if (type is null) {
-				isCustomType = false;
-				return null;
-			}
-
-			var map = GetOrInitMapEntry (type.Assembly);
-			isCustomType = map.Registrar.IsCustomType (type);
-			return type;
-		}
-
-		internal static T? ConstructNSObject<T> (IntPtr ptr, Type type)
-			where T : class, INativeObject
-		{
-			var map = GetOrInitMapEntry (type.Assembly);
-			return (T?)(INativeObject?)map.Registrar.CreateNSObject (type.TypeHandle, ptr);
-		}
-
-		internal static T? ConstructINativeObject<T> (IntPtr ptr, bool owns, Type type)
-			where T : class, INativeObject
-		{
-			var map = GetOrInitMapEntry (type.Assembly);
-			return (T?)map.Registrar.CreateINativeObject (type.TypeHandle, ptr, owns);
-		}
-
-		static MapInfo GetOrInitMapEntry (Assembly assembly)
-		{
-			var assemblyName = assembly.FullName!;
-			if (!assembly_map.TryGetValue (assemblyName, out var map))
-			{
-				map = assembly_map [assemblyName] = new MapInfo (RuntimeTypeHandleEqualityComparer);
-			}
-
-			return map;
-		}
-
-		internal static T? ConstructNSObject<T> (Type type, NativeHandle nativeHandle)
-			where T : class, INativeObject
-		{
-			if (!TryGetMapEntry (type.Assembly.GetName ().Name!, out var entry))
-				return null;
-			return (T?) entry.Registrar.ConstructNSObject (type.TypeHandle, nativeHandle);
-		}
-
-		internal static T? ConstructINativeObject<T> (Type type, NativeHandle nativeHandle, bool owns)
-			where T : class, INativeObject
-		{
-			if (!TryGetMapEntry (type.Assembly.GetName ().Name!, out var entry))
-				return null;
-			return (T?) entry.Registrar.ConstructINativeObject (type.TypeHandle, nativeHandle, owns);
+			throw new NotImplementedException ();
 		}
 
 		// helper functions for converting between native and managed objects
@@ -456,33 +304,25 @@ namespace ObjCRuntime {
 			*ptr = rv;
 		}
 
-		public unsafe static IntPtr GetDotnetType<T> (IntPtr* exception_gchandle) {
+		public unsafe static IntPtr GetDotnetType (Type type, IntPtr* exception_gchandle)
+			=> Try (() => Runtime.AllocGCHandle (type), exception_gchandle);
+
+		public unsafe static void Try (Action action, IntPtr* exception_gchandle)
+		{
 			try {
-				var type = typeof (T);
-
-				// erase generic type arguments if any
-				if (type.IsGenericType) {
-					type = type.GetGenericTypeDefinition ();
-				}
-
-				var rv = RuntimeTypeHandle.ToIntPtr (type.TypeHandle);
-#if TRACE
-				Runtime.NSLog ($"GetDotnetType: {type} (0x{rv:x})");
-#endif
-				return rv;
+				action();
 			} catch (Exception ex) {
 				*exception_gchandle = Runtime.AllocGCHandle(ex);
-				return IntPtr.Zero;
 			}
 		}
 
-		public unsafe static void Register<T> (IntPtr* exception_gchandle)
-			where T : IManagedRegistrarType
+		public unsafe static T? Try<T> (Func<T> func, IntPtr* exception_gchandle)
 		{
 			try {
-				Register<T> ();
+				return func();
 			} catch (Exception ex) {
-				*exception_gchandle = Runtime.AllocGCHandle(ex);
+				*exception_gchandle = Runtime.AllocGCHandle (ex);
+				return default;
 			}
 		}
 	}
