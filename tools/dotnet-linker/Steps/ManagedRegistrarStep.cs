@@ -208,7 +208,38 @@ namespace Xamarin.Linker {
 				}
 			}
 
+			var exportedTypeName = DerivedLinkContext.StaticRegistrar.GetExportedTypeName (type, registerAttribute);
+			AddCreateManagedInstanceMethod (type, exportedTypeName);
+
 			return true;
+		}
+
+		void AddCreateManagedInstanceMethod(TypeDefinition type, string exportedTypeName)
+		{
+			var ctor = type.Methods.SingleOrDefault (v => v.IsConstructor && !v.IsStatic && v.Parameters.Count == 1 && v.Parameters [0].ParameterType.Is ("ObjCRuntime", "NativeHandle"))
+				?? type.Methods.SingleOrDefault (v => v.IsConstructor && !v.IsStatic && v.Parameters.Count == 1 && v.Parameters [0].ParameterType.Is ("System", "IntPtr"));
+
+			if (ctor is null)
+			{
+				return;
+			}
+
+			var callbackType = GetCallbackType (type);
+
+			var name = $"_dotnet_{exportedTypeName}_CreateManagedInstance";
+			var callback = type.AddMethod (name, MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig, abr.System_IntPtr);
+			callback.CustomAttributes.Add (CreateUnmanagedCallersAttribute (name));
+
+			ctor.CustomAttributes.Add (CreateDynamicDependencyAttribute (callbackType, callback.Name));
+			callback.AddParameter ("pobj", abr.System_IntPtr);
+
+			_ = callback.CreateBody (out var il);
+			il.Emit (OpCodes.Ldarg_0);
+			if (ctor.Parameters [0].ParameterType.Is ("ObjCRuntime", "NativeHandle"))
+				il.Emit (OpCodes.Call, abr.NativeObject_op_Implicit_NativeHandle);
+			il.Emit (OpCodes.Newobj, ctor);
+			il.Emit (OpCodes.Call, abr.Runtime_AllocGCHandle);
+			il.Emit (OpCodes.Ret);
 		}
 
 		void ProcessMethod (MethodDefinition method, HashSet<MethodDefinition> methods_to_wrap)
@@ -272,6 +303,18 @@ namespace Xamarin.Linker {
 			}
 		}
 
+		TypeDefinition GetCallbackType (TypeDefinition type)
+		{
+			var callbackType = type.NestedTypes.SingleOrDefault (v => v.Name == "__Registrar_Callbacks__");
+			if (callbackType is null) {
+				callbackType = new TypeDefinition (string.Empty, "__Registrar_Callbacks__", TypeAttributes.NestedPrivate | TypeAttributes.Sealed | TypeAttributes.Class);
+				callbackType.BaseType = abr.System_Object;
+				type.NestedTypes.Add (callbackType);
+			}
+
+			return callbackType;
+		}
+
 		int counter;
 		void CreateUnmanagedCallersMethod (MethodDefinition method, AssemblyTrampolineInfo infos, List<TypeDefinition> proxyInterfaces)
 		{
@@ -279,12 +322,7 @@ namespace Xamarin.Linker {
 			var placeholderType = abr.System_IntPtr;
 			var name = $"callback_{counter++}_{Sanitize (method.DeclaringType.FullName)}_{Sanitize (method.Name)}";
 
-			var callbackType = method.DeclaringType.NestedTypes.SingleOrDefault (v => v.Name == "__Registrar_Callbacks__");
-			if (callbackType is null) {
-				callbackType = new TypeDefinition (string.Empty, "__Registrar_Callbacks__", TypeAttributes.NestedPrivate | TypeAttributes.Sealed | TypeAttributes.Class);
-				callbackType.BaseType = abr.System_Object;
-				method.DeclaringType.NestedTypes.Add (callbackType);
-			}
+			var callbackType = GetCallbackType (method.DeclaringType);
 
 			var callback = callbackType.AddMethod (name, MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig, placeholderType);
 			callback.CustomAttributes.Add (CreateUnmanagedCallersAttribute (name));
@@ -321,12 +359,8 @@ namespace Xamarin.Linker {
 				//     // generated implementation of the proxy interface:
 				//     public void __IRegistrarGenericTypeProxy__CustomNSObject_1____SomeMethod (IntPtr sel, IntPtr p0, IntPtr* exception_gchandle)
 				//     {
-				//         try {
-				//             var obj0 = Runtime.GetNSObject<T> (p0);
-				//             SomeMethod (obj0);
-				//         } catch (Exception ex) {
-				//             *exception_gchandle = Runtime.AllocGCHandle (ex);
-				//         }
+			    //         var obj0 = Runtime.TryGetManagedInstance<T> (p0) ?? Runtime.CreateManagedInstance<T> (p0);
+			    //         SomeMethod (obj0);
 				//     }
 				//
 				//     // generated registrar callbacks:
@@ -335,8 +369,13 @@ namespace Xamarin.Linker {
 				//         [UnmanagedCallersOnly (EntryPoint = "_callback_1_CustomNSObject_1_SomeMethod")]
 				//         public unsafe static void callback_1_CustomNSObject_1_SomeMethod (IntPtr pobj, IntPtr sel, IntPtr p0, IntPtr* exception_gchandle)
 				//         {
-				//             var proxy = (__IRegistrarGenericTypeProxy__CustomNSObject_1__)Runtime.GetNSObject (pobj);
-				//             proxy.__IRegistrarGenericTypeProxy__CustomNSObject_1____SomeMethod (sel, p0, exception_gchandle);
+				//             try {
+				//                 var proxy = Runtime.TryGetManagedInstance<__IRegistrarGenericTypeProxy__CustomNSObject_1__> (pobj, evenInFinalizerQueue: true)
+				//                     ?? throw new Exception("Cannot create an instance of type CustomNSObject<T> from native code.");
+				//                 proxy.__IRegistrarGenericTypeProxy__CustomNSObject_1____SomeMethod (sel, p0, exception_gchandle);
+				//             } catch (Exception ex) {
+				//                 *exception_gchandle = Runtime.AllocGCHandle (ex);
+				//             }
 				//         }
 				//     }
 				// }
@@ -366,6 +405,7 @@ namespace Xamarin.Linker {
 					interfaceMethod.AddParameter (parameter.Name, parameter.ParameterType);
 				}
 
+				// TODO: we need to move the `try-catch` block to the interface method
 				// we need to wait until we know all the parameters of the interface method before we generate this method
 				EmitCallToProxyMethod (method, callback, interfaceMethod);
 			} else {
@@ -380,8 +420,20 @@ namespace Xamarin.Linker {
 			// We don't know the generic parameters of the type we're working with but we know it is a NSObject and it
 			// implements the proxy interface. The generic parameters will be resolved in the proxy method through the v-table.
 			il.Emit (OpCodes.Ldarg_0);
-			il.Emit (OpCodes.Call, abr.Runtime_GetNSObject__System_IntPtr);
-			il.Emit (OpCodes.Castclass, proxyInterfaceMethod.DeclaringType);
+			il.EmitLdc (true) // evenInFinalizerQueue
+			il.Emit (OpCodes.Call, abr.Runtime_ManagedRegistrar_TryGetManagedInstance_T__System_IntPtr.CreateGenericInstanceMethod (proxyInterfaceMethod.DeclaringType));
+			il.Emit (OpCodes.Dup);
+
+			var notNullTarget = il.Create (OpCodes.Nop);
+			il.Emit (OpCodes.Brtrue_S, notNullTarget);
+			
+			// throw an exception when there isn't a managed instance yet
+			il.Emit (OpCodes.Ldc_I4, 4133);
+			il.Emit (OpCodes.Ldstr, $"Cannot construct an instance of the type '{method.DeclaringType.FullName}' from Objective-C because the type is generic.");
+			il.Emit (OpCodes.Call, abr.Runtime_CreateRuntimeException);
+			il.Emit (OpCodes.Throw);
+
+			il.Append (notNullTarget);
 
 			if (callback.HasParameters) {
 				// skip the first argument (the handle of the object)
@@ -881,19 +933,45 @@ namespace Xamarin.Linker {
 					var ea = StaticRegistrar.CreateExportAttribute (method);
 					if (ea is not null && ea.ArgumentSemantic == ArgumentSemantic.Copy)
 						il.Emit (OpCodes.Call, abr.Runtime_CopyAndAutorelease);
-					if (IsOpenType (type)) {
-						il.Emit (OpCodes.Call, abr.Runtime_GetNSObject__System_IntPtr);
-						// cast to the generic type to verify that the item is actually of the correct type
-						il.Emit (OpCodes.Unbox_Any, type);
-					} else {
-						il.Emit (OpCodes.Ldarg_1); // SEL
-						il.Emit (OpCodes.Ldtoken, method);
+
+					if (type.IsInterface) {
+						var notNullTarget = il.Create (OpCodes.Nop);
+						il.Emit (OpCodes.Dup); // duplicate the handle for TryCreateNSObject
+
 						il.EmitLdc (parameter == -1); // evenInFinalizerQueue
-						il.Emit (OpCodes.Call, abr.Runtime_GetNSObject_T___System_IntPtr_System_IntPtr_System_RuntimeMethodHandle_bool.CreateGenericInstanceMethod (type));
-						var tmpVariable = il.Body.AddVariable (type);
-						il.Emit (OpCodes.Stloc, tmpVariable);
-						il.Emit (OpCodes.Ldloc, tmpVariable);
+						il.Emit (OpCodes.Call, abr.Runtime_ManagedRegistrar_TryGetManagedInstance_T___System_IntPtr.CreateGenericInstanceMethod (type));
+						il.Emit (OpCodes.Dup);
+						il.Emit (OpCodes.Brtrue_S, notNullTarget);
+
+						// for protocols we call TryCreateManagedInstance<T> and create the wrapper if needed
+						il.Emit (OpCodes.Pop); // remove the null value returned by TryGetManagedInstance
+						il.Emit (OpCodes.Dup); // duplicate the native handle
+						il.Emit (OpCodes.Call, abr.Runtime_ManagedRegistrar_TryCreateManagedInstance_T___System_IntPtr.CreateGenericInstanceMethod (type));
+						il.Emit (OpCodes.Dup);
+						il.Emit (OpCodes.Brtrue_S, notNullTarget);
+
+						// fallback -> create protocol wrapper unless the handle is zero
+						il.Emit (OpCodes.Pop); // remove the null value returned by TryCreateManagedInstance
+						il.Emit (OpCodes.Dup); // duplicate the native handle
+						il.Emit (OpCodes.Ldsfld, abr.System_IntPtr_Zero);
+						il.Emit (OpCodes.Beq, notNullTarget);
+
+						StaticRegistrar.GetInstantiableType (type.Resolve (), exceptions, GetMethodSignature (method), out var ctor);
+						il.Emit (OpCodes.Dup); // duplicate the native handle
+						if (ctor.Parameters [0].ParameterType.Is ("ObjCRuntime", "NativeHandle"))
+							il.Emit (OpCodes.Call, abr.NativeObject_op_Implicit_NativeHandle);
+						il.EmitLdc (false); // owns
+						il.Emit (OpCodes.Newobj, method.Module.ImportReference (ctor));
+
+						il.Append (notNullTarget);
+						il.Append (OpCodes.Pop); // remove the duplicate handle
+					} else {
+						// for other types we should call CreateManagedInstance<T> which will throw an exception if the type cannot be created
+						il.Emit (OpCodes.Pop); // remove the null value returned by TryGetManagedInstance
+						il.Emit (OpCodes.Dup); // duplicate the native handle
+						il.Emit (OpCodes.Call, abr.Runtime_ManagedRegistrar_GetOrCreateManagedInstance_T___System_IntPtr.CreateGenericInstanceMethod (type));
 					}
+
 
 					nativeType = abr.System_IntPtr;
 				} else {
@@ -916,9 +994,7 @@ namespace Xamarin.Linker {
 			if (StaticRegistrar.IsNativeObject (DerivedLinkContext, type)) {
 				if (toManaged) {
 					if (IsOpenType (type)) {
-						il.Emit (OpCodes.Call, abr.Runtime_GetNSObject__System_IntPtr);
-						// cast to the generic type to verify that the item is actually of the correct type
-						il.Emit (OpCodes.Unbox_Any, type);
+						il.Emit (OpCodes.Call, abr.Runtime_ManagedRegistrar_TryGetManagedInstance_T__System_IntPtr.CreateGenericInstanceMethod (type));
 					} else {
 						StaticRegistrar.GetInstantiableType (type.Resolve (), exceptions, GetMethodSignature (method), out var ctor);
 						EnsureVisible (method, ctor);
@@ -936,11 +1012,10 @@ namespace Xamarin.Linker {
 						il.Emit (OpCodes.Ldloc, handleVariable); // handle
 						il.Emit (OpCodes.Ldsfld, abr.System_IntPtr_Zero);
 						il.Emit (OpCodes.Beq, loadObjectVariable);
-						// objectVariable = TryGetNSObject (handle, false) as TargetType
+						// objectVariable = TryGetManagedInstance (handle) as TargetType
 						il.Emit (OpCodes.Ldloc, handleVariable); // handle
-						il.Emit (OpCodes.Ldc_I4_0); // false
-						il.Emit (OpCodes.Call, abr.Runtime_TryGetNSObject);
-						il.Emit (OpCodes.Castclass, targetType);
+						il.EmitLdc (false); // owns
+						il.Emit (OpCodes.Call, abr.Runtime_ManagedRegistrar_TryGetManagedInstance_T__System_IntPtr.CreateGenericInstanceMethod (type));
 						il.Emit (OpCodes.Stloc, objectVariable);
 						// if (objectVariable is null)
 						//     objectVariable = new TargetType (handle, false)
@@ -1172,10 +1247,7 @@ namespace Xamarin.Linker {
 					return;
 				}
 
-				var gim = new GenericInstanceMethod (abr.Runtime_GetNSObject_T___System_IntPtr);
-				gim.GenericArguments.Add (abr.Foundation_NSString);
-				conversionFunction = gim;
-
+				conversionFunction = abr.Runtime_ManagedRegistrar_GetOrCreateManagedInstance_T___System_IntPtr.CreateGenericInstanceMethod (abr.Foundation_NSString);
 				conversionFunction2 = abr.CurrentAssembly.MainModule.ImportReference (getValueMethod);
 			} else {
 				throw ErrorHelper.CreateError (99, Errors.MX0099, $"can't convert from '{inputType.FullName}' to '{outputType.FullName}' in {descriptiveMethodName}");

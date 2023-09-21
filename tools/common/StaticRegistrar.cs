@@ -2932,11 +2932,37 @@ namespace Registrar {
 				registered_assemblies.Add (new (GetAssemblies ().Single (v => GetAssemblyName (v) == single_assembly), single_assembly));
 			}
 
+			declarations.AppendLine ("@class __Dotnet_Types__;");
+			ifaces.AppendLine ("@interface __Dotnet_Types__");
+			ifaces.AppendLine ("@end");
+			sb.AppendLine ("@implementation __Dotnet_Types__");
+			sb.AppendLine ("@end");
+
 			foreach (var @class in allTypes) {
 				var isPlatformType = IsPlatformType (@class.Type);
 				var flags = MTTypeFlags.None;
 
 				skip.Clear ();
+
+#if NET
+				if (LinkContext.App.Registrar == RegistrarMode.ManagedStatic) {
+					var selector = Runtime.ManagedRegistrar.ConstructGetNativeClassSelector("");
+					sb.WriteLine ($"@interface __Dotnet_Types__ ({EncodeNonAsciiCharacters (@class.ExportedName)})");
+					sb.Indent ();
+					sb.WriteLine ($"+(id) {selector} (BOOL*) isCustomType;");
+					sb.Unindent ();
+					sb.WriteLine ($"@end");
+					sb.WriteLine ($"@implementation __Dotnet_Types__ ({EncodeNonAsciiCharacters (@class.ExportedName)})");
+					sb.Indent ();
+					sb.WriteLine ($"+(id) {selector} (BOOL*) isCustomType {{");
+					var isCustomType = !@class.IsProtocol && !@class.IsCategory && !isPlatformType;
+					sb.WriteLine ($"*isCustomType = {isCustomType ? "YES" : "NO"};");
+					sb.WriteLine ($"return [{EncodeNonAsciiCharacters (@class.ExportedName)} class];")
+					sb.WriteLine ($"}}");
+					sb.Unindent ();
+					sb.WriteLine ($"@end");
+				}
+#endif
 
 				uint token_ref = uint.MaxValue;
 				if (!@class.IsProtocol && !@class.IsCategory) {
@@ -3153,6 +3179,15 @@ namespace Registrar {
 					}
 				}
 
+#if NET
+				if (LinkContext.App.Registrar == RegistrarMode.ManagedStatic && !is_protocol) {
+					iface.WriteLine ("-(id) __dotnet_CreateManagedInstance;");
+					if (!@class.IsCategory) {
+						iface.WriteLine ("+(BOOL) _dotnet_IsUserType;");
+					}
+				}
+#endif
+
 				if (@class.Methods is not null) {
 					foreach (var method in @class.Methods) {
 						try {
@@ -3193,6 +3228,20 @@ namespace Registrar {
 						sb.WriteLine ("}");
 					}
 					sb.Indent ();
+
+#if NET
+					if (LinkContext.App.Registrar == RegistrarMode.ManagedStatic) {
+						sb.WriteLine ("extern (id) _dotnet_{0}_CreateManagedInstance(id pobj);", EncodeNonAsciiCharacters (@class.BaseType.ExportedName));
+						sb.WriteLine ("-(id) __dotnet_CreateManagedInstance {");
+						sb.WriteLine ("    return _dotnet_{0}_CreateManagedInstance (self);", EncodeNonAsciiCharacters (@class.BaseType.ExportedName));
+						sb.WriteLine ("}");
+
+						if (!@class.IsCategory) {
+							sb.WriteLine ("+(BOOL) _dotnet_IsUserType { return YES; }");
+						}
+					}
+#endif
+
 					if (@class.Methods is not null) {
 						foreach (var method in @class.Methods) {
 							if (skip.Contains (method))

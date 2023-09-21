@@ -1,5 +1,11 @@
 # Managed static registrar
 
+    This documentation is outdated. For example the lookup tables were
+    completely removed. Please ask in Discord for up-to-date information
+    before this section is updated.
+
+TODO: Rewrite the documentation if the experimental code is approved.
+
 The managed static registrar is a variation of the static registrar where we
 don't use features the NativeAOT compiler doesn't support (most notably
 metadata tokens).
