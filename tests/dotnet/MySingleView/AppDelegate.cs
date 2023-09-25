@@ -21,5 +21,9 @@ namespace MySingleView {
 
 			return true;
 		}
+
+#if NET
+		public AppDelegate (ObjCRuntime.NativeHandle nativeHandle) : base(nativeHandle) { }
+#endif
 	}
 }

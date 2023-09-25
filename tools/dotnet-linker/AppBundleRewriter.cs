@@ -390,18 +390,6 @@ namespace Xamarin.Linker {
 			}
 		}
 
-		public TypeReference ObjCRuntime_IManagedRegistrar {
-			get {
-				return GetTypeReference (PlatformAssembly, "ObjCRuntime.IManagedRegistrar", out var _);
-			}
-		}
-
-		public TypeReference Foundation_INSObjectFactory {
-			get {
-				return GetTypeReference (PlatformAssembly, "Foundation.INSObjectFactory", out var _);
-			}
-		}
-
 		public TypeReference ObjCRuntime_INativeObject {
 			get {
 				return GetTypeReference (PlatformAssembly, "ObjCRuntime.INativeObject", out var _);
@@ -757,96 +745,6 @@ namespace Xamarin.Linker {
 			}
 		}
 
-		public MethodReference RegistrarHelper_Register {
-			get {
-				return GetMethodReference (PlatformAssembly,
-						ObjCRuntime_RegistrarHelper, "Register",
-						isStatic: true,
-						ObjCRuntime_IManagedRegistrar);
-			}
-		}
-
-		public MethodReference IManagedRegistrar_LookupUnmanagedFunction {
-			get {
-				return GetMethodReference (PlatformAssembly,
-						ObjCRuntime_IManagedRegistrar, "LookupUnmanagedFunction",
-						isStatic: false,
-						System_String,
-						System_Int32);
-			}
-		}
-
-		public MethodReference IManagedRegistrar_LookupType {
-			get {
-				return GetMethodReference (PlatformAssembly,
-						ObjCRuntime_IManagedRegistrar, "LookupType",
-						isStatic: false,
-						System_UInt32);
-			}
-		}
-
-		public MethodReference IManagedRegistrar_LookupTypeId {
-			get {
-				return GetMethodReference (PlatformAssembly,
-						ObjCRuntime_IManagedRegistrar, "LookupTypeId",
-						isStatic: false,
-						System_RuntimeTypeHandle);
-			}
-		}
-
-		public MethodReference IManagedRegistrar_ConstructNSObject {
-			get {
-				return GetMethodReference (PlatformAssembly,
-						ObjCRuntime_IManagedRegistrar, "ConstructNSObject",
-						isStatic: false,
-						System_RuntimeTypeHandle,
-						ObjCRuntime_NativeHandle);
-			}
-		}
-
-		public MethodReference INSObjectFactory__Xamarin_ConstructNSObject {
-			get {
-				return GetMethodReference (PlatformAssembly,
-						Foundation_INSObjectFactory, "_Xamarin_ConstructNSObject",
-						nameof (INSObjectFactory__Xamarin_ConstructNSObject),
-						isStatic: true,
-						ObjCRuntime_NativeHandle);
-			}
-		}
-
-		public MethodReference IManagedRegistrar_ConstructINativeObject {
-			get {
-				return GetMethodReference (PlatformAssembly,
-						ObjCRuntime_IManagedRegistrar, "ConstructINativeObject",
-						nameof (IManagedRegistrar_ConstructINativeObject),
-						isStatic: false,
-						System_RuntimeTypeHandle,
-						ObjCRuntime_NativeHandle,
-						System_Boolean);
-			}
-		}
-
-		public MethodReference INativeObject__Xamarin_ConstructINativeObject {
-			get {
-				return GetMethodReference (PlatformAssembly,
-						ObjCRuntime_INativeObject, "_Xamarin_ConstructINativeObject",
-						nameof (INativeObject__Xamarin_ConstructINativeObject),
-						isStatic: true,
-						ObjCRuntime_NativeHandle,
-						System_Boolean);
-			}
-		}
-
-		public MethodReference IManagedRegistrar_RegisterWrapperTypes {
-			get {
-				return GetMethodReference (PlatformAssembly, ObjCRuntime_IManagedRegistrar, "RegisterWrapperTypes", (v) =>
-						v.HasParameters
-						&& v.Parameters.Count == 1
-						&& v.Parameters [0].ParameterType is GenericInstanceType git && git.ElementType.Is ("System.Collections.Generic", "Dictionary`2")
-						&& !v.HasGenericParameters);
-			}
-		}
-
 		public MethodReference Runtime_AllocGCHandle {
 			get {
 				return GetMethodReference (PlatformAssembly,
@@ -909,6 +807,51 @@ namespace Xamarin.Linker {
 						isStatic: true,
 						genericParameterCount: 1,
 						System_IntPtr);
+			}
+		}
+
+		public MethodReference Runtime_TryGetManagedInstance_T___ObjCRuntime_NativeHandle_bool {
+			get {
+				return GetMethodReference (PlatformAssembly,
+						ObjCRuntime_Runtime, "TryGetManagedInstance",
+						nameof (Runtime_TryGetManagedInstance_T___ObjCRuntime_NativeHandle_bool),
+						isStatic: true,
+						genericParameterCount: 1,
+						ObjCRuntime_NativeHandle,
+						System_Boolean);
+			}
+		}
+
+		public MethodReference Runtime_TryCreateManagedInstance_T___ObjCRuntime_NativeHandle {
+			get {
+				return GetMethodReference (PlatformAssembly,
+						ObjCRuntime_Runtime, "CreateManagedInstance",
+						nameof (Runtime_TryCreateManagedInstance_T___ObjCRuntime_NativeHandle),
+						isStatic: true,
+						genericParameterCount: 1,
+						ObjCRuntime_NativeHandle);
+			}
+		}
+
+		public MethodReference Runtime_CreateManagedInstance_T___ObjCRuntime_NativeHandle {
+			get {
+				return GetMethodReference (PlatformAssembly,
+						ObjCRuntime_Runtime, "TryCreateManagedInstance",
+						nameof (Runtime_CreateManagedInstance_T___ObjCRuntime_NativeHandle),
+						isStatic: true,
+						genericParameterCount: 1,
+						ObjCRuntime_NativeHandle);
+			}
+		}
+
+		public MethodReference Runtime_GetOrCreateManagedInstance_T___ObjCRuntime_NativeHandle {
+			get {
+				return GetMethodReference (PlatformAssembly,
+						ObjCRuntime_Runtime, "GetOrCreateManagedInstance",
+						nameof (Runtime_CreateManagedInstance_T___ObjCRuntime_NativeHandle),
+						isStatic: true,
+						genericParameterCount: 1,
+						ObjCRuntime_NativeHandle);
 			}
 		}
 

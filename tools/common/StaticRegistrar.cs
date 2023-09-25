@@ -2932,12 +2932,27 @@ namespace Registrar {
 				registered_assemblies.Add (new (GetAssemblies ().Single (v => GetAssemblyName (v) == single_assembly), single_assembly));
 			}
 
+#if NET
+			if (LinkContext.App.Registrar == RegistrarMode.ManagedStatic) {
+				declarations.AppendLine ("@class __dotnet;");
+
+				interfaces.AppendLine ("@interface __dotnet : NSObject");
+				interfaces.AppendLine ("@end");
+				interfaces.AppendLine ();
+
+				sb.AppendLine ("@implementation __dotnet");
+				sb.AppendLine ("@end");
+				sb.AppendLine ();
+			}
+#endif
+
 			foreach (var @class in allTypes) {
 				var isPlatformType = IsPlatformType (@class.Type);
 				var flags = MTTypeFlags.None;
 
 				skip.Clear ();
 
+				// TODO skip generating the map for managed registrar?
 				uint token_ref = uint.MaxValue;
 				if (!@class.IsProtocol && !@class.IsCategory) {
 					if (!isPlatformType)
@@ -3000,8 +3015,87 @@ namespace Registrar {
 						CheckNamespace (@class, exceptions);
 					}
 				}
-				if (@class.IsWrapper && isPlatformType)
+				
+				if (@class.IsWrapper && isPlatformType) {
+#if NET
+					// TODO do not duplicate this code...
+					if (LinkContext.App.Registrar == RegistrarMode.ManagedStatic && !@class.IsProtocol && !@class.IsCategory) {
+						// TODO fix this without this workaround
+						var introducedIn = GetSdkIntroducedVersion (@class.Type, out _);
+						Version sdk = GetSDKVersion ();
+						if (sdk < introducedIn) {
+							// TODO add an exception?
+							sb.WriteLine($"// skipping generating code for wrapper class {EncodeNonAsciiCharacters (@class.ExportedName)} (introduced in {introducedIn}, current sdk is {sdk})");
+							continue;
+						} else {
+							sb.WriteLine($"// generating code for wrapper class {EncodeNonAsciiCharacters (@class.ExportedName)} (introduced in {introducedIn}, current sdk is {sdk})");
+						}
+
+						if (@class.ExportedName == "MPSCNNConvolutionStateNode"
+							|| @class.ExportedName == "GKHybridStrategist") {
+							sb.WriteLine($"// skipping generating code for {@class.ExportedName} -- TODO fix this");
+							continue;
+						}
+
+						CheckNamespace (@class, exceptions);
+
+						// var selector = Runtime.ConstructGetNativeClassSelector("");
+						var selector = $"__dotnet_GetNativeClass_{Sanitize (@class.Type.Module.Assembly.Name.Name)}__{Sanitize (@class.Type.FullName)}:";
+
+						interfaces.WriteLine ($"@interface __dotnet ({EncodeNonAsciiCharacters (@class.ExportedName)})");
+						interfaces.Indent ();
+						interfaces.WriteLine ($"+(id) {selector} (BOOL*) isCustomType;");
+						interfaces.Unindent ();
+						interfaces.WriteLine ($"@end");
+						interfaces.WriteLine ();
+
+						sb.WriteLine ($"@implementation __dotnet ({EncodeNonAsciiCharacters (@class.ExportedName)})");
+						sb.Indent ();
+						sb.WriteLine ($"+(id) {selector} (BOOL*) isCustomType {{");
+						var isCustomType = !@class.IsProtocol && !@class.IsCategory && !isPlatformType ? "YES" : "NO";
+						sb.WriteLine ($"*isCustomType = {isCustomType};");
+						sb.WriteLine ($"return [{EncodeNonAsciiCharacters (@class.ExportedName)} class];");
+						sb.WriteLine ($"}}");
+						sb.Unindent ();
+						sb.WriteLine ($"@end");
+						sb.WriteLine ();
+
+						interfaces.WriteLine ($"@interface {EncodeNonAsciiCharacters (@class.ExportedName)} (__dotnet)");
+						interfaces.Indent ();
+
+						sb.WriteLine ($"@implementation {EncodeNonAsciiCharacters (@class.ExportedName)} (__dotnet)");
+						sb.Indent ();
+
+						var ctor = FindConstructorWithOneParameter (@class.Type.Resolve (), "ObjCRuntime", "NativeHandle")
+							?? FindConstructorWithOneParameter (@class.Type.Resolve (), "System", "IntPtr")
+							?? FindConstructorWithTwoParameters (@class.Type.Resolve (), "ObjCRuntime", "NativeHandle", "System", "Boolean")
+							?? FindConstructorWithTwoParameters (@class.Type.Resolve (), "System", "IntPtr", "System", "Boolean");
+						if (!@class.Type.Resolve ().IsAbstract && ctor is not null) {
+							var genericSuffix = @class.Type.HasGenericParameters ? $"_{@class.Type.GenericParameters.Count}" : "";							
+							interfaces.WriteLine ("-(id) __dotnet_CreateManagedInstance;");
+							sb.WriteLine ("id dotnet_{0}{1}_CreateManagedInstance (id self);", EncodeNonAsciiCharacters (@class.ExportedName), genericSuffix);
+							sb.WriteLine ("-(id) __dotnet_CreateManagedInstance {");
+							sb.WriteLine ("return dotnet_{0}{1}_CreateManagedInstance (self);", EncodeNonAsciiCharacters (@class.ExportedName), genericSuffix);
+							sb.WriteLine ("}");
+						}
+
+						if (!@class.IsCategory) {
+							interfaces.WriteLine ("-(id) __dotnet_IsUserType;");
+							sb.WriteLine ("+(BOOL) __dotnet_IsUserType {");
+							sb.WriteLine ($"return NO;");
+							sb.WriteLine ("}");
+						}
+
+						sb.Unindent ();
+						sb.WriteLine ("@end");
+						sb.WriteLine ();
+
+						interfaces.Unindent ();
+						interfaces.WriteLine ($"@end");
+					}
+#endif
 					continue;
+				}
 
 				if (@class.Methods is null && isPlatformType && !@class.IsProtocol && !@class.IsCategory)
 					continue;
@@ -3153,6 +3247,22 @@ namespace Registrar {
 					}
 				}
 
+#if NET
+				if (LinkContext.App.Registrar == RegistrarMode.ManagedStatic && !is_protocol) {
+					var ctor = FindConstructorWithOneParameter (@class.Type.Resolve (), "ObjCRuntime", "NativeHandle")
+						?? FindConstructorWithOneParameter (@class.Type.Resolve (), "System", "IntPtr")
+						?? FindConstructorWithTwoParameters (@class.Type.Resolve (), "ObjCRuntime", "NativeHandle", "System", "Boolean")
+						?? FindConstructorWithTwoParameters (@class.Type.Resolve (), "System", "IntPtr", "System", "Boolean");
+					if (!@class.Type.Resolve ().IsAbstract && ctor is not null) {
+						iface.WriteLine ("-(id) __dotnet_CreateManagedInstance;");
+					}
+
+					if (!@class.IsCategory) {
+						iface.WriteLine ("+(BOOL) __dotnet_IsUserType;");
+					}
+				}
+#endif
+
 				if (@class.Methods is not null) {
 					foreach (var method in @class.Methods) {
 						try {
@@ -3193,6 +3303,32 @@ namespace Registrar {
 						sb.WriteLine ("}");
 					}
 					sb.Indent ();
+
+#if NET
+					if (LinkContext.App.Registrar == RegistrarMode.ManagedStatic) {
+						var ctor = FindConstructorWithOneParameter (@class.Type.Resolve (), "ObjCRuntime", "NativeHandle")
+							?? FindConstructorWithOneParameter (@class.Type.Resolve (), "System", "IntPtr")
+							?? FindConstructorWithTwoParameters (@class.Type.Resolve (), "ObjCRuntime", "NativeHandle", "System", "Boolean")
+							?? FindConstructorWithTwoParameters (@class.Type.Resolve (), "System", "IntPtr", "System", "Boolean");
+						if (!@class.Type.Resolve ().IsAbstract && ctor is not null) {
+							var genericSuffix = @class.Type.HasGenericParameters ? $"_{@class.Type.GenericParameters.Count}" : "";							
+							sb.WriteLine ("id dotnet_{0}{1}_CreateManagedInstance (id self);", EncodeNonAsciiCharacters (@class.ExportedName), genericSuffix);
+							sb.WriteLine ("-(id) __dotnet_CreateManagedInstance {");
+							sb.WriteLine ("return dotnet_{0}{1}_CreateManagedInstance (self);", EncodeNonAsciiCharacters (@class.ExportedName), genericSuffix);
+							sb.WriteLine ("}");
+							sb.WriteLine ();
+						}
+
+						var isUserType = !@class.IsProtocol && !@class.IsCategory && !@class.IsWrapper && !@class.IsModel ? "YES" : "NO";
+						if (!@class.IsCategory) {
+							sb.WriteLine ("+(BOOL) __dotnet_IsUserType {");
+							sb.WriteLine ($"return {isUserType};");
+							sb.WriteLine ("}");
+							sb.WriteLine ();
+						}
+					}
+#endif
+					
 					if (@class.Methods is not null) {
 						foreach (var method in @class.Methods) {
 							if (skip.Contains (method))
@@ -3209,6 +3345,31 @@ namespace Registrar {
 					sb.WriteLine ("@end");
 					if (hasClangDiagnostic)
 						sb.AppendLine ("#pragma clang diagnostic pop");
+
+#if NET
+					if (LinkContext.App.Registrar == RegistrarMode.ManagedStatic && !@class.IsProtocol && !@class.IsCategory) {
+						// var selector = Runtime.ConstructGetNativeClassSelector("");
+						var selector = $"__dotnet_GetNativeClass_{Sanitize (@class.Type.Module.Assembly.Name.Name)}__{Sanitize (@class.Type.FullName)}:";
+
+						sb.WriteLine ($"@interface __dotnet ({EncodeNonAsciiCharacters (@class.ExportedName)})");
+						sb.Indent ();
+						sb.WriteLine ($"+(id) {selector} (BOOL*) isCustomType;");
+						sb.Unindent ();
+						sb.WriteLine ($"@end");
+						sb.WriteLine ();
+
+						sb.WriteLine ($"@implementation __dotnet ({EncodeNonAsciiCharacters (@class.ExportedName)})");
+						sb.Indent ();
+						sb.WriteLine ($"+(id) {selector} (BOOL*) isCustomType {{");
+						var isCustomType = !@class.IsProtocol && !@class.IsCategory && !isPlatformType ? "YES" : "NO";
+						sb.WriteLine ($"*isCustomType = {isCustomType};");
+						sb.WriteLine ($"return [{EncodeNonAsciiCharacters (@class.ExportedName)} class];");
+						sb.WriteLine ($"}}");
+						sb.Unindent ();
+						sb.WriteLine ($"@end");
+						sb.WriteLine ();
+					}
+#endif
 				}
 				sb.WriteLine ();
 			}
@@ -5248,22 +5409,6 @@ namespace Registrar {
 		{
 			var token = member.MetadataToken;
 
-#if NET
-			if (App.Registrar == RegistrarMode.ManagedStatic) {
-				if (implied_type == TokenType.TypeDef && member is TypeDefinition td) {
-					if (App.Configuration.AssemblyTrampolineInfos.TryGetValue (td.Module.Assembly, out var infos) && infos.TryGetRegisteredTypeIndex (td, out var id)) {
-						id = id | (uint) TokenType.TypeDef;
-						return WriteFullTokenReference (member.Module.Assembly, INVALID_TOKEN_REF, member.Module.Name, id, member.FullName, out token_ref, out exception);
-					}
-					throw ErrorHelper.CreateError (99, $"Can't create a token reference to an unregistered type when using the managed static registrar: {member.FullName}");
-				}
-				if (implied_type == TokenType.Method) {
-					throw ErrorHelper.CreateError (99, $"Can't create a token reference to a method when using the managed static registrar: {member.FullName}");
-				}
-				throw ErrorHelper.CreateError (99, "Can't create a token reference to a token type {0} when using the managed static registrar.", implied_type.ToString ());
-			}
-#endif
-
 			/* We can't create small token references if we're in partial mode, because we may have multiple arrays of registered assemblies, and no way of saying which one we refer to with the assembly index */
 			if (IsSingleAssembly)
 				return TryCreateFullTokenReference (member, out token_ref, out exception);
@@ -5650,6 +5795,38 @@ namespace Registrar {
 
 			return base.SkipRegisterAssembly (assembly);
 		}
+
+		static string Sanitize (string str)
+		{
+			str = str.Replace ('.', '_');
+			str = str.Replace ('-', '_');
+			str = str.Replace ('/', '_');
+			str = str.Replace ('`', '_');
+			str = str.Replace ('<', '_');
+			str = str.Replace ('>', '_');
+			str = str.Replace ('$', '_');
+			str = str.Replace ('@', '_');
+			str = EncodeNonAsciiCharacters (str);
+			str = str.Replace ('\\', '_');
+			return str;
+		}
+		
+		static MethodDefinition? FindConstructorWithOneParameter (TypeDefinition type, string ns, string cls)
+			=> type.Methods.SingleOrDefault (method =>
+				method.IsConstructor
+					&& !method.IsStatic
+					&& method.HasParameters
+					&& method.Parameters.Count == 1
+					&& method.Parameters [0].ParameterType.Is (ns, cls));
+
+		static MethodDefinition? FindConstructorWithTwoParameters (TypeDefinition type, string ns1, string cls1, string ns2, string cls2)
+			=> type.Methods.SingleOrDefault (method =>
+				method.IsConstructor
+					&& !method.IsStatic
+					&& method.HasParameters
+					&& method.Parameters.Count == 2
+					&& method.Parameters [0].ParameterType.Is (ns1, cls2)
+					&& method.Parameters [1].ParameterType.Is (ns2, cls2));
 
 		// Find the value of the [UserDelegateType] attribute on the specified delegate
 		TypeReference GetUserDelegateType (TypeReference delegateType)

@@ -1740,6 +1740,12 @@ namespace ObjCRuntime {
 			if (o is not null)
 				return o;
 
+#if NET
+			if (IsManagedStaticRegistrar) {
+				return CreateManagedInstance<NSObject> (ptr);
+			}
+#endif
+
 			return ConstructNSObject (ptr, Class.GetClassForObject (ptr), missingCtorResolution);
 		}
 
@@ -1763,6 +1769,12 @@ namespace ObjCRuntime {
 			// First check if we got an object of the expected type
 			if (obj is T o)
 				return o;
+
+#if NET
+			if (IsManagedStaticRegistrar) {
+				return CreateManagedInstance<T> (ptr);
+			}
+#endif
 
 			// We either didn't find an object, or it was of the wrong type, so we need to create a new instance.
 
@@ -1846,6 +1858,12 @@ namespace ObjCRuntime {
 				// We found an instance of the wrong type, and we're asked to not return that.
 				// So fall through to create a new instance instead.
 			}
+
+#if NET
+			if (IsManagedStaticRegistrar) {
+				return CreateManagedInstance<NSObject> (ptr);
+			}
+#endif
 
 			// Try to get the managed type that correspond to this exact native type
 			IntPtr p = Class.GetClassForObject (ptr);
@@ -1949,6 +1967,18 @@ namespace ObjCRuntime {
 				}
 			}
 
+#if NET
+			if (IsManagedStaticRegistrar) {
+				// TODO pass `owns`
+				var instance = TryCreateManagedInstance (ptr, target_type);
+				if (instance is null) {
+					// TODO MissingCtor (...)
+					throw new InvalidOperationException ($"TODO: MissingCtor ({ptr}, {target_type}, {implementation}, {owns})");
+				}
+				return instance;
+			}
+#endif
+
 			// Lookup the ObjC type of the ptr and see if we can use it.
 			implementation = LookupINativeObjectImplementation (ptr, target_type, implementation);
 
@@ -2005,6 +2035,18 @@ namespace ObjCRuntime {
 					throw new InvalidCastException ($"Unable to cast object of type '{o.GetType ().FullName}' to type '{typeof (T).FullName}'.");
 				}
 			}
+
+#if NET
+			if (IsManagedStaticRegistrar) {
+				// TODO pass `owns`
+				var instance = TryCreateManagedInstance<T> (ptr);
+				if (instance is null) {
+					// TODO call MissingCtor (...)
+					throw new InvalidOperationException ($"TODO: MissingCtor ({ptr}, {typeof (T)}, {owns})");
+				}
+				return instance;
+			}
+#endif
 
 			// Lookup the ObjC type of the ptr and see if we can use it.
 			implementation = LookupINativeObjectImplementation (ptr, typeof (T), implementation, forced_type: forced_type);
@@ -2068,24 +2110,14 @@ namespace ObjCRuntime {
 				return null;
 
 			// Check if the static registrar knows about this protocol
-			if (IsManagedStaticRegistrar) {
-#if NET
-				var rv = RegistrarHelper.FindProtocolWrapperType (type);
-				if (rv is not null)
-					return rv;
-#else
-				throw ErrorHelper.CreateError (99, Xamarin.Bundler.Errors.MX0099 /* Internal error */, "The managed static registrar is only available for .NET");
-#endif
-			} else {
-				unsafe {
-					var map = options->RegistrationMap;
-					if (map is not null) {
-						var token = Class.GetTokenReference (type, throw_exception: false);
-						if (token != INVALID_TOKEN_REF) {
-							var wrapper_token = xamarin_find_protocol_wrapper_type (token);
-							if (wrapper_token != INVALID_TOKEN_REF)
-								return Class.ResolveTypeTokenReference (wrapper_token);
-						}
+			unsafe {
+				var map = options->RegistrationMap;
+				if (map is not null) {
+					var token = Class.GetTokenReference (type, throw_exception: false);
+					if (token != INVALID_TOKEN_REF) {
+						var wrapper_token = xamarin_find_protocol_wrapper_type (token);
+						if (wrapper_token != INVALID_TOKEN_REF)
+							return Class.ResolveTypeTokenReference (wrapper_token);
 					}
 				}
 			}
@@ -2160,6 +2192,12 @@ namespace ObjCRuntime {
 		[BindingImpl (BindingImplOptions.Optimizable)]
 		static bool SlowIsUserType (IntPtr cls)
 		{
+#if NET
+			if (IsManagedStaticRegistrar) {
+				return _IsUserType (cls); // TODO better name
+			}
+#endif
+
 			unsafe {
 				if (options->RegistrationMap is not null && options->RegistrationMap->map_count > 0) {
 					var map = options->RegistrationMap->map;
