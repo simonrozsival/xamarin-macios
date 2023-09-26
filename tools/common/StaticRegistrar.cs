@@ -2948,11 +2948,15 @@ namespace Registrar {
 
 			foreach (var @class in allTypes) {
 				var isPlatformType = IsPlatformType (@class.Type);
+#if NET
+				if (LinkContext.App.Registrar != RegistrarMode.ManagedStatic) {
+				// DO NOT GENERATE THE MAP FOR MANAGED STATIC REGISTRAR
+				// TODO this is sooo ugly
+#endif
 				var flags = MTTypeFlags.None;
 
 				skip.Clear ();
 
-				// TODO skip generating the map for managed registrar?
 				uint token_ref = uint.MaxValue;
 				if (!@class.IsProtocol && !@class.IsCategory) {
 					if (!isPlatformType)
@@ -3015,6 +3019,10 @@ namespace Registrar {
 						CheckNamespace (@class, exceptions);
 					}
 				}
+#if NET
+				// DO NOT GENERATE THE MAP FOR MANAGED STATIC REGISTRAR
+				}
+#endif
 				
 				if (@class.IsWrapper && isPlatformType) {
 #if NET
@@ -3071,11 +3079,11 @@ namespace Registrar {
 							?? FindConstructorWithTwoParameters (@class.Type.Resolve (), "ObjCRuntime", "NativeHandle", "System", "Boolean")
 							?? FindConstructorWithTwoParameters (@class.Type.Resolve (), "System", "IntPtr", "System", "Boolean");
 						if (!@class.Type.Resolve ().IsAbstract && ctor is not null) {
-							var genericSuffix = @class.Type.HasGenericParameters ? $"_{@class.Type.GenericParameters.Count}" : "";							
+							var genericSuffix = @class.Type.HasGenericParameters ? $"_{@class.Type.GenericParameters.Count}" : "";
 							interfaces.WriteLine ("-(id) __dotnet_CreateManagedInstance;");
-							sb.WriteLine ("id dotnet_{0}{1}_CreateManagedInstance (id self);", EncodeNonAsciiCharacters (@class.ExportedName), genericSuffix);
+							sb.WriteLine ("id dotnet_CreateManagedInstance_{0}{1} (id self);", EncodeNonAsciiCharacters (@class.ExportedName), genericSuffix);
 							sb.WriteLine ("-(id) __dotnet_CreateManagedInstance {");
-							sb.WriteLine ("return dotnet_{0}{1}_CreateManagedInstance (self);", EncodeNonAsciiCharacters (@class.ExportedName), genericSuffix);
+							sb.WriteLine ("return dotnet_CreateManagedInstance_{0}{1} (self);", EncodeNonAsciiCharacters (@class.ExportedName), genericSuffix);
 							sb.WriteLine ("}");
 						}
 
@@ -3312,9 +3320,9 @@ namespace Registrar {
 							?? FindConstructorWithTwoParameters (@class.Type.Resolve (), "System", "IntPtr", "System", "Boolean");
 						if (!@class.Type.Resolve ().IsAbstract && ctor is not null) {
 							var genericSuffix = @class.Type.HasGenericParameters ? $"_{@class.Type.GenericParameters.Count}" : "";							
-							sb.WriteLine ("id dotnet_{0}{1}_CreateManagedInstance (id self);", EncodeNonAsciiCharacters (@class.ExportedName), genericSuffix);
+							sb.WriteLine ("id dotnet_CreateManagedInstance_{0}{1} (id self);", EncodeNonAsciiCharacters (@class.ExportedName), genericSuffix);
 							sb.WriteLine ("-(id) __dotnet_CreateManagedInstance {");
-							sb.WriteLine ("return dotnet_{0}{1}_CreateManagedInstance (self);", EncodeNonAsciiCharacters (@class.ExportedName), genericSuffix);
+							sb.WriteLine ("return dotnet_CreateManagedInstance_{0}{1} (self);", EncodeNonAsciiCharacters (@class.ExportedName), genericSuffix);
 							sb.WriteLine ("}");
 							sb.WriteLine ();
 						}
@@ -3349,18 +3357,20 @@ namespace Registrar {
 #if NET
 					if (LinkContext.App.Registrar == RegistrarMode.ManagedStatic && !@class.IsProtocol && !@class.IsCategory) {
 						// var selector = Runtime.ConstructGetNativeClassSelector("");
-						var selector = $"__dotnet_GetNativeClass_{Sanitize (@class.Type.Module.Assembly.Name.Name)}__{Sanitize (@class.Type.FullName)}:";
+						var mangledName = $"{Sanitize (@class.Type.Module.Assembly.Name.Name)}__{Sanitize (@class.Type.FullName)}";
+						var getNativeClassSelector = $"__dotnet_GetNativeClass_{mangledName}:";
+						var createManagedInstanceSelector = $"__dotnet_CreateManagedInstance_{mangledName}:";
 
 						sb.WriteLine ($"@interface __dotnet ({EncodeNonAsciiCharacters (@class.ExportedName)})");
 						sb.Indent ();
-						sb.WriteLine ($"+(id) {selector} (BOOL*) isCustomType;");
+						sb.WriteLine ($"+(id) {getNativeClassSelector} (BOOL*) isCustomType;");
 						sb.Unindent ();
 						sb.WriteLine ($"@end");
 						sb.WriteLine ();
 
 						sb.WriteLine ($"@implementation __dotnet ({EncodeNonAsciiCharacters (@class.ExportedName)})");
 						sb.Indent ();
-						sb.WriteLine ($"+(id) {selector} (BOOL*) isCustomType {{");
+						sb.WriteLine ($"+(id) {getNativeClassSelector} (BOOL*) isCustomType {{");
 						var isCustomType = !@class.IsProtocol && !@class.IsCategory && !isPlatformType ? "YES" : "NO";
 						sb.WriteLine ($"*isCustomType = {isCustomType};");
 						sb.WriteLine ($"return [{EncodeNonAsciiCharacters (@class.ExportedName)} class];");
@@ -3373,6 +3383,16 @@ namespace Registrar {
 				}
 				sb.WriteLine ();
 			}
+
+#if NET
+			if (LinkContext.App.Registrar == RegistrarMode.ManagedStatic) {
+				// DO NOT GENERATE THE MAP FOR MANAGED STATIC REGISTRAR
+				map_init.AppendLine ("}");
+				sb.WriteLine (map_init.ToString ());
+				ErrorHelper.ThrowIfErrors (exceptions);
+				return;
+			}
+#endif
 
 			map.AppendLine ("{ NULL, 0 },");
 			map.AppendLine ("};");
@@ -3451,6 +3471,7 @@ namespace Registrar {
 				}
 				map.AppendLine ("};");
 			}
+
 			map.AppendLine ("static struct MTRegistrationMap __xamarin_registration_map = {");
 			map.AppendLine ($"\"{Xamarin.ProductConstants.Hash}\",");
 			map.AppendLine ("__xamarin_registration_assemblies,");

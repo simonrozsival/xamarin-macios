@@ -810,51 +810,6 @@ namespace Xamarin.Linker {
 			}
 		}
 
-		public MethodReference Runtime_TryGetManagedInstance_T___ObjCRuntime_NativeHandle_bool {
-			get {
-				return GetMethodReference (PlatformAssembly,
-						ObjCRuntime_Runtime, "TryGetManagedInstance",
-						nameof (Runtime_TryGetManagedInstance_T___ObjCRuntime_NativeHandle_bool),
-						isStatic: true,
-						genericParameterCount: 1,
-						ObjCRuntime_NativeHandle,
-						System_Boolean);
-			}
-		}
-
-		public MethodReference Runtime_TryCreateManagedInstance_T___ObjCRuntime_NativeHandle {
-			get {
-				return GetMethodReference (PlatformAssembly,
-						ObjCRuntime_Runtime, "CreateManagedInstance",
-						nameof (Runtime_TryCreateManagedInstance_T___ObjCRuntime_NativeHandle),
-						isStatic: true,
-						genericParameterCount: 1,
-						ObjCRuntime_NativeHandle);
-			}
-		}
-
-		public MethodReference Runtime_CreateManagedInstance_T___ObjCRuntime_NativeHandle {
-			get {
-				return GetMethodReference (PlatformAssembly,
-						ObjCRuntime_Runtime, "TryCreateManagedInstance",
-						nameof (Runtime_CreateManagedInstance_T___ObjCRuntime_NativeHandle),
-						isStatic: true,
-						genericParameterCount: 1,
-						ObjCRuntime_NativeHandle);
-			}
-		}
-
-		public MethodReference Runtime_GetOrCreateManagedInstance_T___ObjCRuntime_NativeHandle {
-			get {
-				return GetMethodReference (PlatformAssembly,
-						ObjCRuntime_Runtime, "GetOrCreateManagedInstance",
-						nameof (Runtime_CreateManagedInstance_T___ObjCRuntime_NativeHandle),
-						isStatic: true,
-						genericParameterCount: 1,
-						ObjCRuntime_NativeHandle);
-			}
-		}
-
 		public MethodReference Runtime_CreateRuntimeException {
 			get {
 				return GetMethodReference (PlatformAssembly,

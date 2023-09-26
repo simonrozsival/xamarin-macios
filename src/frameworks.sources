@@ -1959,7 +1959,6 @@ SHARED_SOURCES = \
 	ObjCRuntime/ErrorHelper.runtime.cs \
 	ObjCRuntime/Exceptions.cs \
 	ObjCRuntime/ExceptionMode.cs \
-	ObjCRuntime/IManagedRegistrar.cs \
 	ObjCRuntime/Method.cs \
 	ObjCRuntime/Registrar.cs \
 	ObjCRuntime/RegistrarHelper.cs \

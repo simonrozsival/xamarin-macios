@@ -326,8 +326,10 @@ namespace ObjCRuntime {
 			}
 
 #if NET
-			if (options->RegistrationMap is not null && options->RegistrationMap->map is not null) {
-				ClassHandles.InitializeClassHandles (options->RegistrationMap->map);
+			if (!IsManagedStaticRegistrar) {
+				if (options->RegistrationMap is not null && options->RegistrationMap->map is not null) {
+					ClassHandles.InitializeClassHandles (options->RegistrationMap->map);
+				}
 			}
 #endif
 
@@ -1399,54 +1401,10 @@ namespace ObjCRuntime {
 		}
 
 		// The 'selector' and 'method' arguments are only used in error messages.
-#if NET
-		static T? ConstructNSObject<T> (IntPtr ptr, Type type, MissingCtorResolution missingCtorResolution, IntPtr sel, RuntimeMethodHandle method_handle) where T : NSObject, INSObjectFactory
-#else
 		static T? ConstructNSObject<T> (IntPtr ptr, Type type, MissingCtorResolution missingCtorResolution, IntPtr sel, RuntimeMethodHandle method_handle) where T : class, INativeObject
-#endif
 		{
 			if (type is null)
 				throw new ArgumentNullException (nameof (type));
-#if NET
-			if (Runtime.IsManagedStaticRegistrar) {
-				T? instance = default;
-				var nativeHandle = new NativeHandle (ptr);
-
-				// We want to create an instance of `type` and if we have the chance to use the factory method
-				// on the generic type, we will prefer it to using the lookup table.
-				if (typeof (T) == type
-					&& typeof (T) != typeof (NSObject)
-					&& !(typeof (T).IsInterface || typeof (T).IsAbstract)) {
-					instance = ConstructNSObjectViaFactoryMethod (nativeHandle);
-				}
-
-				// Generic types can only be instantiated through the factory method and if that failed, we can't
-				// fall back to the lookup tables and we need to stop here.
-				if (type.IsGenericType && instance is null) {
-					CannotCreateManagedInstanceOfGenericType (ptr, IntPtr.Zero, type, missingCtorResolution, sel, method_handle);
-					return null;
-				}
-
-				// If we couldn't create an instance of T through the factory method, we'll use the lookup table
-				// based on the RuntimeTypeHandle.
-				//
-				// This isn't possible for generic types - we don't know the type arguments at compile time
-				// (otherwise we would be able to create an instance of T through the factory method).
-				// For non-generic types, we can call the NativeHandle constructor based on the RuntimeTypeHandle.
-
-				if (instance is null) {
-					instance = RegistrarHelper.ConstructNSObject<T> (type, nativeHandle);
-				}
-
-				if (instance is null) {
-					// If we couldn't create an instance using the lookup table either, it means `type` doesn't contain
-					// a suitable constructor.
-					MissingCtor (ptr, IntPtr.Zero, type, missingCtorResolution, sel, method_handle);
-				}
-
-				return instance;
-			}
-#endif
 
 			var ctor = GetIntPtrConstructor (type);
 
@@ -1467,17 +1425,6 @@ namespace ObjCRuntime {
 #endif
 
 			return (T) ctor.Invoke (ctorArguments);
-
-#if NET
-			// It isn't possible to call T._Xamarin_ConstructNSObject (...) directly from the parent function. For some
-			// types, the app crashes with a SIGSEGV:
-			//
-			//   error: * Assertion at /Users/runner/work/1/s/src/mono/mono/mini/mini-generic-sharing.c:2283, condition `m_class_get_vtable (info->klass)' not met
-			//
-			// When the same call is made from a separate function, it works fine.
-			static T? ConstructNSObjectViaFactoryMethod (NativeHandle handle)
-				=> T._Xamarin_ConstructNSObject (handle) as T;
-#endif
 		}
 
 		// The generic argument T is only used to cast the return value.
@@ -1488,56 +1435,6 @@ namespace ObjCRuntime {
 
 			if (type.IsByRef)
 				type = type.GetElementType ()!;
-
-#if NET
-			if (Runtime.IsManagedStaticRegistrar) {
-				var nativeHandle = new NativeHandle (ptr);
-				T? instance = null;
-
-				// We want to create an instance of `type` and if we have the chance to use the factory method
-				// on the generic type, we will prefer it to using the lookup table.
-				if (typeof (T) == type
-					&& typeof (T) != typeof (INativeObject)
-					&& typeof (T) != typeof (NSObject)
-					&& !(typeof (T).IsInterface || typeof (T).IsAbstract)) {
-					instance = ConstructINativeObjectViaFactoryMethod (nativeHandle, owns);
-				}
-
-				// Generic types can only be instantiated through the factory method and if that failed, we can't
-				// fall back to the lookup tables and we need to stop here.
-				if (type.IsGenericType && instance is null) {
-					CannotCreateManagedInstanceOfGenericType (ptr, IntPtr.Zero, type, missingCtorResolution, sel, method_handle);
-					return null;
-				}
-
-				// If we couldn't create an instance of T through the factory method, we'll use the lookup table
-				// based on the RuntimeTypeHandle.
-				//
-				// This isn't possible for generic types - we don't know the type arguments at compile time
-				// (otherwise we would be able to create an instance of T through the factory method).
-				// For non-generic types, we can call the NativeHandle constructor based on the RuntimeTypeHandle.
-
-				// If type is an NSObject, we prefer the NSObject lookup table
-				if (instance is null && type != typeof (NSObject) && type.IsSubclassOf (typeof (NSObject))) {
-					instance = (T?)(INativeObject?) RegistrarHelper.ConstructNSObject<T> (type, nativeHandle);
-					if (instance is not null && owns) {
-						Runtime.TryReleaseINativeObject (instance);
-					}
-				}
-
-				if (instance is null && type != typeof (INativeObject)) {
-					instance = RegistrarHelper.ConstructINativeObject<T> (type, nativeHandle, owns);
-				}
-
-				if (instance is null) {
-					// If we couldn't create an instance using the lookup table either, it means `type` doesn't contain
-					// a suitable constructor.
-					MissingCtor (ptr, IntPtr.Zero, type, missingCtorResolution, sel, method_handle);
-				}
-
-				return instance;
-			}
-#endif
 
 			var ctor = GetIntPtr_BoolConstructor (type);
 
@@ -1559,17 +1456,6 @@ namespace ObjCRuntime {
 			ctorArguments [1] = owns;
 
 			return (T?) ctor.Invoke (ctorArguments);
-
-#if NET
-			// It isn't possible to call T._Xamarin_ConstructINativeObject (...) directly from the parent function. For some
-			// types, the app crashes with a SIGSEGV:
-			//
-			//   error: * Assertion at /Users/runner/work/1/s/src/mono/mono/mini/mini-generic-sharing.c:2283, condition `m_class_get_vtable (info->klass)' not met
-			//
-			// When the same call is made from a separate function, it works fine.
-			static T? ConstructINativeObjectViaFactoryMethod (NativeHandle nativeHandle, bool owns)
-				=> T._Xamarin_ConstructINativeObject (nativeHandle, owns) as T;
-#endif
 		}
 
 		static IntPtr CreateNSObject (IntPtr type_gchandle, IntPtr handle, NSObject.Flags flags)
@@ -1742,7 +1628,7 @@ namespace ObjCRuntime {
 
 #if NET
 			if (IsManagedStaticRegistrar) {
-				return CreateManagedInstance<NSObject> (ptr);
+				return ManagedRegistrar.CreateManagedInstance<NSObject> (ptr);
 			}
 #endif
 
@@ -1772,7 +1658,7 @@ namespace ObjCRuntime {
 
 #if NET
 			if (IsManagedStaticRegistrar) {
-				return CreateManagedInstance<T> (ptr);
+				return ManagedRegistrar.CreateManagedInstance<T> (ptr);
 			}
 #endif
 
@@ -1861,7 +1747,7 @@ namespace ObjCRuntime {
 
 #if NET
 			if (IsManagedStaticRegistrar) {
-				return CreateManagedInstance<NSObject> (ptr);
+				return ManagedRegistrar.CreateManagedInstance<NSObject> (ptr);
 			}
 #endif
 
@@ -1970,7 +1856,7 @@ namespace ObjCRuntime {
 #if NET
 			if (IsManagedStaticRegistrar) {
 				// TODO pass `owns`
-				var instance = TryCreateManagedInstance (ptr, target_type);
+				var instance = ManagedRegistrar.TryCreateManagedInstance (ptr, target_type);
 				if (instance is null) {
 					// TODO MissingCtor (...)
 					throw new InvalidOperationException ($"TODO: MissingCtor ({ptr}, {target_type}, {implementation}, {owns})");
@@ -2039,7 +1925,7 @@ namespace ObjCRuntime {
 #if NET
 			if (IsManagedStaticRegistrar) {
 				// TODO pass `owns`
-				var instance = TryCreateManagedInstance<T> (ptr);
+				var instance = ManagedRegistrar.TryCreateManagedInstance<T> (ptr);
 				if (instance is null) {
 					// TODO call MissingCtor (...)
 					throw new InvalidOperationException ($"TODO: MissingCtor ({ptr}, {typeof (T)}, {owns})");
@@ -2194,7 +2080,7 @@ namespace ObjCRuntime {
 		{
 #if NET
 			if (IsManagedStaticRegistrar) {
-				return _IsUserType (cls); // TODO better name
+				return ManagedRegistrar.IsUserType (cls);
 			}
 #endif
 
@@ -2684,15 +2570,6 @@ namespace ObjCRuntime {
 				return 0;
 			var rv = obj.ConformsToProtocol (protocol);
 			return (sbyte) (rv ? 1 : 0);
-		}
-
-		static IntPtr LookupUnmanagedFunction (IntPtr assembly, IntPtr symbol, int id)
-		{
-#if NET
-			return RegistrarHelper.LookupUnmanagedFunction (assembly, Marshal.PtrToStringAuto (symbol), id);
-#else
-			return IntPtr.Zero;
-#endif
 		}
 	}
 

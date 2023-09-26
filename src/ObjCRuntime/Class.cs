@@ -242,7 +242,7 @@ namespace ObjCRuntime {
 		{
 #if NET
 			if (Runtime.IsManagedStaticRegistrar) {
-				return Runtime.GetNativeClass (type, out is_custom_type);
+				return Runtime.ManagedRegistrar.GetNativeClass (type, out is_custom_type);
 			}
 #endif
 
@@ -260,27 +260,8 @@ namespace ObjCRuntime {
 
 			// Look for the type in the type map.
 			var asm_name = type.Assembly.GetName ().Name!;
-			int mod_token;
-			int type_token;
-
-			if (Runtime.IsManagedStaticRegistrar) {
-#if NET
-				mod_token = unchecked((int) Runtime.INVALID_TOKEN_REF);
-				type_token = unchecked((int) RegistrarHelper.LookupRegisteredTypeId (type));
-
-#if LOG_TYPELOAD
-				Runtime.NSLog ($"FindClass ({type.FullName}, {is_custom_type}): type token: 0x{type_token.ToString ("x")}");
-#endif
-
-				if (type_token == -1)
-					return IntPtr.Zero;
-#else
-				throw ErrorHelper.CreateError (99, Xamarin.Bundler.Errors.MX0099 /* Internal error */, "The managed static registrar is only available for .NET");
-#endif // NET
-			} else {
-				mod_token = type.Module.MetadataToken;
-				type_token = type.MetadataToken & ~0x02000000 /* TokenType.TypeDef */;
-			}
+			int mod_token = type.Module.MetadataToken;
+			int type_token = type.MetadataToken & ~0x02000000 /* TokenType.TypeDef */;
 
 			for (int i = 0; i < map->map_count; i++) {
 				var class_map = map->map [i];
@@ -495,15 +476,6 @@ namespace ObjCRuntime {
 			switch (token & 0xFF000000) {
 			case 0x02000000: // TypeDef
 				Type type;
-#if NET
-				if (Runtime.IsManagedStaticRegistrar) {
-					type = RegistrarHelper.LookupRegisteredType (assembly, token & 0x00FFFFFF);
-#if LOG_TYPELOAD
-					Runtime.NSLog ($"ResolveToken (0x{token:X}) => Type: {type.FullName}");
-#endif
-					return type;
-				}
-#endif // NET
 				if (module is null) {
 					throw ErrorHelper.CreateError (8053, Errors.MX8053 /* Could not resolve the module in the assembly {0}. */, assembly.FullName);
 				} else {
@@ -632,20 +604,7 @@ namespace ObjCRuntime {
 			var asm_name = type.Module.Assembly.GetName ().Name!;
 
 			// First check if there's a full token reference to this type
-			uint token;
-			if (Runtime.IsManagedStaticRegistrar) {
-#if NET
-				var id = RegistrarHelper.LookupRegisteredTypeId (type);
-				token = GetFullTokenReference (asm_name, unchecked((int) Runtime.INVALID_TOKEN_REF), 0x2000000 /* TokenType.TypeDef */ | unchecked((int) id));
-#if LOG_TYPELOAD
-				Runtime.NSLog ($"GetTokenReference ({type}, {throw_exception}) id: {id} token: 0x{token.ToString ("x")}");
-#endif
-#else
-				throw ErrorHelper.CreateError (99, Xamarin.Bundler.Errors.MX0099 /* Internal error */, "The managed static registrar is only available for .NET");
-#endif // NET
-			} else {
-				token = GetFullTokenReference (asm_name, type.Module.MetadataToken, type.MetadataToken);
-			}
+			uint token = GetFullTokenReference (asm_name, type.Module.MetadataToken, type.MetadataToken);
 			if (token != uint.MaxValue)
 				return token;
 
