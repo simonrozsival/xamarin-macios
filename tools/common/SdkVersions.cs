@@ -26,13 +26,13 @@ namespace Xamarin {
 		public const string MiniOS = "11.0";
 		public const string MinWatchOS = "99.99"; // TODO not supported, many changes required to remove it
 		public const string MinTVOS = "11.0";
-		public const string MinMacCatalyst = "13.1";
+		public const string MinMacCatalyst = "13.5";
 #else
 		public const string MinOSX = "10.15";
 		public const string MiniOS = "11.0";
 		public const string MinWatchOS = "4.0";
 		public const string MinTVOS = "11.0";
-		public const string MinMacCatalyst = "13.1";
+		public const string MinMacCatalyst = "13.5";
 #endif
 
 		public const string MiniOSSimulator = "13.7";

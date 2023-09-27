@@ -3074,17 +3074,17 @@ namespace Registrar {
 						sb.WriteLine ($"@implementation {EncodeNonAsciiCharacters (@class.ExportedName)} (__dotnet)");
 						sb.Indent ();
 
-						var ctor = FindConstructorWithOneParameter (@class.Type.Resolve (), "ObjCRuntime", "NativeHandle")
-							?? FindConstructorWithOneParameter (@class.Type.Resolve (), "System", "IntPtr")
-							?? FindConstructorWithTwoParameters (@class.Type.Resolve (), "ObjCRuntime", "NativeHandle", "System", "Boolean")
-							?? FindConstructorWithTwoParameters (@class.Type.Resolve (), "System", "IntPtr", "System", "Boolean");
-						if (!@class.Type.Resolve ().IsAbstract && ctor is not null) {
-							var genericSuffix = @class.Type.HasGenericParameters ? $"_{@class.Type.GenericParameters.Count}" : "";
-							interfaces.WriteLine ("-(id) __dotnet_CreateManagedInstance;");
-							sb.WriteLine ("id dotnet_CreateManagedInstance_{0}{1} (id self);", EncodeNonAsciiCharacters (@class.ExportedName), genericSuffix);
-							sb.WriteLine ("-(id) __dotnet_CreateManagedInstance {");
-							sb.WriteLine ("return dotnet_CreateManagedInstance_{0}{1} (self);", EncodeNonAsciiCharacters (@class.ExportedName), genericSuffix);
-							sb.WriteLine ("}");
+						if (!@class.Type.Resolve ().IsAbstract) {
+							if (@class.ExportedName != "__monomac_internal_ActionDispatcher") {
+								// TODO remove this hack
+
+								var genericSuffix = @class.Type.HasGenericParameters ? $"_{@class.Type.GenericParameters.Count}" : "";
+								interfaces.WriteLine ("-(id) __dotnet_CreateManagedInstance;");
+								sb.WriteLine ("id dotnet_CreateManagedInstance_{0}{1} (id self);", EncodeNonAsciiCharacters (@class.ExportedName), genericSuffix);
+								sb.WriteLine ("-(id) __dotnet_CreateManagedInstance {");
+								sb.WriteLine ("return dotnet_CreateManagedInstance_{0}{1} (self);", EncodeNonAsciiCharacters (@class.ExportedName), genericSuffix);
+								sb.WriteLine ("}");
+							}
 						}
 
 						if (!@class.IsCategory) {
@@ -3257,12 +3257,11 @@ namespace Registrar {
 
 #if NET
 				if (LinkContext.App.Registrar == RegistrarMode.ManagedStatic && !is_protocol) {
-					var ctor = FindConstructorWithOneParameter (@class.Type.Resolve (), "ObjCRuntime", "NativeHandle")
-						?? FindConstructorWithOneParameter (@class.Type.Resolve (), "System", "IntPtr")
-						?? FindConstructorWithTwoParameters (@class.Type.Resolve (), "ObjCRuntime", "NativeHandle", "System", "Boolean")
-						?? FindConstructorWithTwoParameters (@class.Type.Resolve (), "System", "IntPtr", "System", "Boolean");
-					if (!@class.Type.Resolve ().IsAbstract && ctor is not null) {
-						iface.WriteLine ("-(id) __dotnet_CreateManagedInstance;");
+					if (!@class.Type.Resolve ().IsAbstract) {
+						if (@class.ExportedName != "__monomac_internal_ActionDispatcher") {
+							// TODO remove this hack
+							iface.WriteLine ("-(id) __dotnet_CreateManagedInstance;");
+						}
 					}
 
 					if (!@class.IsCategory) {
@@ -3314,17 +3313,17 @@ namespace Registrar {
 
 #if NET
 					if (LinkContext.App.Registrar == RegistrarMode.ManagedStatic) {
-						var ctor = FindConstructorWithOneParameter (@class.Type.Resolve (), "ObjCRuntime", "NativeHandle")
-							?? FindConstructorWithOneParameter (@class.Type.Resolve (), "System", "IntPtr")
-							?? FindConstructorWithTwoParameters (@class.Type.Resolve (), "ObjCRuntime", "NativeHandle", "System", "Boolean")
-							?? FindConstructorWithTwoParameters (@class.Type.Resolve (), "System", "IntPtr", "System", "Boolean");
-						if (!@class.Type.Resolve ().IsAbstract && ctor is not null) {
-							var genericSuffix = @class.Type.HasGenericParameters ? $"_{@class.Type.GenericParameters.Count}" : "";							
-							sb.WriteLine ("id dotnet_CreateManagedInstance_{0}{1} (id self);", EncodeNonAsciiCharacters (@class.ExportedName), genericSuffix);
-							sb.WriteLine ("-(id) __dotnet_CreateManagedInstance {");
-							sb.WriteLine ("return dotnet_CreateManagedInstance_{0}{1} (self);", EncodeNonAsciiCharacters (@class.ExportedName), genericSuffix);
-							sb.WriteLine ("}");
-							sb.WriteLine ();
+						if (!@class.Type.Resolve ().IsAbstract) {
+							if (@class.ExportedName != "__monomac_internal_ActionDispatcher") {
+								// TODO remove this hack
+
+								var genericSuffix = @class.Type.HasGenericParameters ? $"_{@class.Type.GenericParameters.Count}" : "";							
+								sb.WriteLine ("id dotnet_CreateManagedInstance_{0}{1} (id self);", EncodeNonAsciiCharacters (@class.ExportedName), genericSuffix);
+								sb.WriteLine ("-(id) __dotnet_CreateManagedInstance {");
+								sb.WriteLine ("return dotnet_CreateManagedInstance_{0}{1} (self);", EncodeNonAsciiCharacters (@class.ExportedName), genericSuffix);
+								sb.WriteLine ("}");
+								sb.WriteLine ();
+							}
 						}
 
 						var isUserType = !@class.IsProtocol && !@class.IsCategory && !@class.IsWrapper && !@class.IsModel ? "YES" : "NO";
@@ -3359,7 +3358,6 @@ namespace Registrar {
 						// var selector = Runtime.ConstructGetNativeClassSelector("");
 						var mangledName = $"{Sanitize (@class.Type.Module.Assembly.Name.Name)}__{Sanitize (@class.Type.FullName)}";
 						var getNativeClassSelector = $"__dotnet_GetNativeClass_{mangledName}:";
-						var createManagedInstanceSelector = $"__dotnet_CreateManagedInstance_{mangledName}:";
 
 						sb.WriteLine ($"@interface __dotnet ({EncodeNonAsciiCharacters (@class.ExportedName)})");
 						sb.Indent ();
@@ -5831,23 +5829,6 @@ namespace Registrar {
 			str = str.Replace ('\\', '_');
 			return str;
 		}
-		
-		static MethodDefinition? FindConstructorWithOneParameter (TypeDefinition type, string ns, string cls)
-			=> type.Methods.SingleOrDefault (method =>
-				method.IsConstructor
-					&& !method.IsStatic
-					&& method.HasParameters
-					&& method.Parameters.Count == 1
-					&& method.Parameters [0].ParameterType.Is (ns, cls));
-
-		static MethodDefinition? FindConstructorWithTwoParameters (TypeDefinition type, string ns1, string cls1, string ns2, string cls2)
-			=> type.Methods.SingleOrDefault (method =>
-				method.IsConstructor
-					&& !method.IsStatic
-					&& method.HasParameters
-					&& method.Parameters.Count == 2
-					&& method.Parameters [0].ParameterType.Is (ns1, cls2)
-					&& method.Parameters [1].ParameterType.Is (ns2, cls2));
 
 		// Find the value of the [UserDelegateType] attribute on the specified delegate
 		TypeReference GetUserDelegateType (TypeReference delegateType)

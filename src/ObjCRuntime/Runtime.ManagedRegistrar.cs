@@ -24,30 +24,22 @@ namespace ObjCRuntime {
 				EnsureManagedStaticRegistrar ();
 
 				if (handle == NativeHandle.Zero) {
+					Runtime.NSLog ($"TryCreateManagedInstance ({handle:x}, {type}) => handle is zero");
 					return null;
 				}
 
-				if (RespondsToSelector (handle, s_createManagedInstance.Value)) {
-					var objectHandle = Messaging.IntPtr_objc_msgSend (handle, s_createManagedInstance.Value);
-					return GetGCHandleTarget (objectHandle) as INativeObject;
-				} else {
-					// Fallback in case of C-structs and protocol wrappers
-					// TODO pass the `owns` parameter? right now we always assume it's `false`
+				var instancePtr = RespondsToSelector (handle, s_createManagedInstance.Value)
+					? Messaging.IntPtr_objc_msgSend (handle, s_createManagedInstance.Value)
+					: CreateManagedInstanceViaFallback (handle, type);
 
-					var selectorName = ConstructCreateManagedInstanceSelector (type);
-					var selector = Selector.GetHandle (selectorName);
+				var managedInstance = GetGCHandleTarget (instancePtr);
+				Runtime.NSLog ($"TryCreateManagedInstance ({handle:x}, {type}) => {managedInstance}");
 
-					if (s_dotnet.Value == NativeHandle.Zero) {
-						// TODO this is a bug in the registrar generator, this should never happen
-						throw new UnreachableException ("The __dotnet class is not available.");
-					} else if (!ClassRespondsToSelector (s_dotnet.Value, selector)) {
-						// TODO this is a bug in the registrar generator, this should never happen
-						throw new UnreachableException ($"We are missing the {selectorName} ({selector}) selector on the __dotnet class.");
-					}
-
-					var objectHandle = Messaging.IntPtr_objc_msgSend (handle, selector);
-					return GetGCHandleTarget (objectHandle) as INativeObject;
+				if (managedInstance is Exception exception) {
+					throw exception;
 				}
+
+				return (INativeObject?)managedInstance;
 			}
 
 			internal static T? CreateManagedInstance<T> (NativeHandle handle)
@@ -59,8 +51,12 @@ namespace ObjCRuntime {
 					return null;
 				}
 
-				return TryCreateManagedInstance<T> (handle)
-					?? throw Runtime.CreateRuntimeException (8027, $"Failed to marshal Objective-C object 0x{handle:x} to managed type {typeof (T)}.");
+				INativeObject? obj = TryCreateManagedInstance (handle, typeof (T));
+				if (obj is T managedInstance) {
+					return managedInstance;
+				}
+
+				throw Runtime.CreateRuntimeException (8027, $"Failed to marshal Objective-C object {handle:x} to managed type {typeof (T).FullName} - got {obj} ({obj?.GetType().FullName ?? "<null>"}) instead.");
 			}
 
 			internal static unsafe NativeHandle GetNativeClass (Type type, out bool isCustomType)
@@ -106,48 +102,35 @@ namespace ObjCRuntime {
 				=> $"__dotnet_CreateManagedInstance_{MangleName (assemblyName, typeName)}:";
 
 			private static string MangleName (string assemblyName, string typeName)
-			{
-				return $"{Sanitize (assemblyName)}__{Sanitize (typeName)}";
-
-				static string Sanitize (string str)
-				{
-					str = str.Replace ('.', '_');
-					str = str.Replace ('/', '_');
-					str = str.Replace ('`', '_');
-					str = str.Replace ('<', '_');
-					str = str.Replace ('>', '_');
-					str = str.Replace ('$', '_');
-					str = str.Replace ('@', '_');
-					str = EncodeNonAsciiCharacters (str);
-					str = str.Replace ('\\', '_');
-					return str;
-				}
-
-				static string EncodeNonAsciiCharacters (string value)
-				{
-					StringBuilder? sb = null;
-					for (int i = 0; i < value.Length; i++) {
-						char c = value [i];
-						if (c > 127) {
-							if (sb is null) {
-								sb = new StringBuilder (value.Length);
-								sb.Append (value, 0, i);
-							}
-							sb.Append ("\\u");
-							sb.Append (((int) c).ToString ("x4"));
-						} else if (sb is not null) {
-							sb.Append (c);
-						}
-					}
-					return sb is not null ? sb.ToString () : value;
-				}
-			}
+				=> $"{Sanitize (assemblyName)}__{Sanitize (typeName)}";
 
 			private static void EnsureManagedStaticRegistrar()
 			{
 				if (!Runtime.IsManagedStaticRegistrar) {
 					throw new UnreachableException ();
 				}
+			}
+
+			private static IntPtr CreateManagedInstanceViaFallback (NativeHandle handle, Type type)
+			{
+				// Fallback in case of C-structs and protocol wrappers
+				// TODO pass the `owns` parameter? right now we always assume it's `false`
+				Runtime.NSLog ($"TryCreateManagedInstance ({handle:x}, {type}) => fallback");
+
+				// TODO we don't generate the Objective-C code this is supposed to call
+
+				var selectorName = ConstructCreateManagedInstanceSelector (type);
+				var selector = Selector.GetHandle (selectorName);
+
+				if (s_dotnet.Value == NativeHandle.Zero) {
+					// TODO this is a bug in the registrar generator, this should never happen
+					throw new UnreachableException ("The __dotnet class is not available.");
+				} else if (!ClassRespondsToSelector (s_dotnet.Value, selector)) {
+					// TODO this is a bug in the registrar generator, this should never happen
+					throw new UnreachableException ($"We are missing the {selectorName} ({selector}) selector on the __dotnet class.");
+				}
+
+				return Messaging.IntPtr_objc_msgSend (handle, selector);
 			}
 
 			private static bool ClassRespondsToSelector (NativeHandle handle, NativeHandle selectorHandle)
@@ -163,6 +146,41 @@ namespace ObjCRuntime {
 			// TODO how do I put this into the `Messaging` class? all of the Messaging methods are generated somehow.
 			[System.Runtime.InteropServices.DllImport (Messaging.LIBOBJC_DYLIB, EntryPoint = "objc_msgSend")]
 			private unsafe extern static IntPtr IntPtr_objc_msgSend_ref_byte (IntPtr receiver, IntPtr selector, byte* isCustomType);
+
+			private static string Sanitize (string str)
+			{
+				str = str.Replace ('.', '_');
+				str = str.Replace ('-', '_');
+				str = str.Replace ('+', '_');
+				str = str.Replace ('/', '_');
+				str = str.Replace ('`', '_');
+				str = str.Replace ('<', '_');
+				str = str.Replace ('>', '_');
+				str = str.Replace ('$', '_');
+				str = str.Replace ('@', '_');
+				str = EncodeNonAsciiCharacters (str);
+				str = str.Replace ('\\', '_');
+				return str;
+			}
+
+			private static string EncodeNonAsciiCharacters (string value)
+			{
+				StringBuilder? sb = null;
+				for (int i = 0; i < value.Length; i++) {
+					char c = value [i];
+					if (c > 127) {
+						if (sb is null) {
+							sb = new StringBuilder (value.Length);
+							sb.Append (value, 0, i);
+						}
+						sb.Append ("\\u");
+						sb.Append (((int) c).ToString ("x4"));
+					} else if (sb is not null) {
+						sb.Append (c);
+					}
+				}
+				return sb is not null ? sb.ToString () : value;
+			}
 		}
 	}
 }

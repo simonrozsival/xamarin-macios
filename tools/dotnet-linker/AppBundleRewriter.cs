@@ -745,6 +745,16 @@ namespace Xamarin.Linker {
 			}
 		}
 
+		public MethodReference Runtime_NSLog {
+			get {
+				return GetMethodReference (PlatformAssembly,
+						ObjCRuntime_Runtime, "NSLog",
+						nameof (Runtime_NSLog),
+						isStatic: true,
+						System_String);
+			}
+		}
+
 		public MethodReference Runtime_AllocGCHandle {
 			get {
 				return GetMethodReference (PlatformAssembly,

@@ -211,6 +211,7 @@ namespace Xamarin.Linker {
 			}
 
 			AddCreateManagedInstanceMethod (type, registerAttribute);
+
 			return true;
 		}
 
@@ -222,15 +223,7 @@ namespace Xamarin.Linker {
 				return false;
 			}
 
-			var ctor = FindConstructorWithOneParameter (type, "ObjCRuntime", "NativeHandle")
-				?? FindConstructorWithOneParameter (type, "System", "IntPtr")
-				?? FindConstructorWithTwoParameters (type, "ObjCRuntime", "NativeHandle", "System", "Boolean")
-				?? FindConstructorWithTwoParameters (type, "System", "IntPtr", "System", "Boolean");
-
-			if (ctor is null) {
-				return false;
-			}
-
+			// TODO for protocol wrappers I guess we need to get the exported type name of the protocol?
 			var exportedTypeName = DerivedLinkContext.StaticRegistrar.GetExportedTypeName (type, registerAttribute);
 
 			var callbackType = GetCallbackType (type);
@@ -238,17 +231,37 @@ namespace Xamarin.Linker {
 			var name = $"dotnet_CreateManagedInstance_{exportedTypeName}{genericSuffix}";
 			var callback = callbackType.AddMethod (name, MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig, abr.System_IntPtr);
 			callback.CustomAttributes.Add (CreateUnmanagedCallersAttribute (name));
-			ctor.CustomAttributes.Add (abr.CreateDynamicDependencyAttribute (callback.Name, callbackType));
-
 			callback.AddParameter ("self", abr.System_IntPtr);
 
 			_ = callback.CreateBody (out var il);
-			il.Emit (OpCodes.Ldarg_0);
-			if (ctor.Parameters [0].ParameterType.Is ("ObjCRuntime", "NativeHandle"))
-				il.Emit (OpCodes.Call, abr.NativeObject_op_Implicit_NativeHandle);
-			if (ctor.Parameters.Count == 2)
-				il.EmitLdc (false); // owns: false // TODO get the value as a parameter
-			il.Emit (OpCodes.Newobj, ctor);
+
+			var ctor = FindConstructorWithOneParameter (type, "ObjCRuntime", "NativeHandle")
+				?? FindConstructorWithOneParameter (type, "System", "IntPtr")
+				?? FindConstructorWithTwoParameters (type, "ObjCRuntime", "NativeHandle", "System", "Boolean")
+				?? FindConstructorWithTwoParameters (type, "System", "IntPtr", "System", "Boolean");
+
+			il.Emit (OpCodes.Ldstr, $"UCO '{name}' -> using ctor '{ctor}' for type '{type}'");
+			il.Emit (OpCodes.Call, abr.Runtime_NSLog);
+
+			if (ctor is not null) {
+				ctor.CustomAttributes.Add (abr.CreateDynamicDependencyAttribute (callback.Name, callbackType));
+
+				il.Emit (OpCodes.Ldarg_0);
+				if (ctor.Parameters [0].ParameterType.Is ("ObjCRuntime", "NativeHandle"))
+					il.Emit (OpCodes.Call, abr.NativeObject_op_Implicit_NativeHandle);
+				if (ctor.Parameters.Count == 2)
+					il.EmitLdc (false); // owns: false // TODO get the value as a parameter
+				il.Emit (OpCodes.Newobj, ctor);
+			} else {
+				var cctor = GetOrCreateStaticConstructor (type);
+				cctor.CustomAttributes.Add (abr.CreateDynamicDependencyAttribute (callback.Name, callbackType));
+
+				// TODO: In the original code we would throw via `MissingCtor`
+				il.Emit (OpCodes.Ldc_I4, 8027);
+				il.Emit (OpCodes.Ldstr, $"The type {type} is missing a constructor that takes a single parameter of type NativeHandle or IntPtr.");
+				il.Emit (OpCodes.Call, abr.Runtime_CreateRuntimeException);
+			}
+
 			il.Emit (OpCodes.Call, abr.Runtime_AllocGCHandle);
 			il.Emit (OpCodes.Ret);
 
@@ -270,6 +283,20 @@ namespace Xamarin.Linker {
 						&& method.Parameters.Count == 2
 						&& method.Parameters [0].ParameterType.Is (ns1, cls2)
 						&& method.Parameters [1].ParameterType.Is (ns2, cls2));
+		}
+
+		MethodDefinition GetOrCreateStaticConstructor (TypeDefinition type)
+		{
+			var staticCtor = type.GetTypeConstructor ();
+			if (staticCtor is null) {
+				staticCtor = type.AddMethod (".cctor", MethodAttributes.Private | MethodAttributes.HideBySig | MethodAttributes.RTSpecialName | MethodAttributes.SpecialName | MethodAttributes.Static, abr!.System_Void);
+				staticCtor.CreateBody (out var il);
+				il.Emit (OpCodes.Ret);
+
+				Annotations.AddPreservedMethod (type, staticCtor);
+			}
+
+			return staticCtor;
 		}
 
 		void ProcessMethod (MethodDefinition method, HashSet<MethodDefinition> methods_to_wrap)
