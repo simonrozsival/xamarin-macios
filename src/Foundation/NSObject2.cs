@@ -74,16 +74,6 @@ namespace Foundation {
 	}
 #endif
 
-#if NET
-	// This interface will be made public when the managed static registrar is used.
-	internal interface INSObjectFactory {
-		// The method will be implemented via custom linker step if the managed static registrar is used
-		// for NSObject subclasses which have an (NativeHandle) or (IntPtr) constructor.
-		[MethodImpl(MethodImplOptions.NoInlining)]
-		virtual static NSObject _Xamarin_ConstructNSObject (NativeHandle handle) => null;
-	}
-#endif
-
 #if NET && !COREBUILD
 	[ObjectiveCTrackedType]
 	[SupportedOSPlatform ("ios")]
@@ -96,9 +86,6 @@ namespace Foundation {
 #if !COREBUILD
 		, IEquatable<NSObject>
 		, IDisposable
-#endif
-#if NET
-		, INSObjectFactory
 #endif
 	{
 #if !COREBUILD

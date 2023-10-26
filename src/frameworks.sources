@@ -2052,7 +2052,6 @@ SHARED_SOURCES = \
 	ObjCRuntime/ErrorHelper.runtime.cs \
 	ObjCRuntime/Exceptions.cs \
 	ObjCRuntime/ExceptionMode.cs \
-	ObjCRuntime/IManagedRegistrar.cs \
 	ObjCRuntime/Method.cs \
 	ObjCRuntime/Registrar.cs \
 	ObjCRuntime/RegistrarHelper.cs \
@@ -2062,6 +2061,7 @@ SHARED_SOURCES = \
 	ObjCRuntime/Runtime.CoreCLR.cs \
 	ObjCRuntime/Runtime.iOS.cs \
 	ObjCRuntime/Runtime.mac.cs \
+	ObjCRuntime/Runtime.ManagedRegistrar.cs \
 	ObjCRuntime/RuntimeException.cs \
 	ObjCRuntime/RuntimeOptions.cs \
 	ObjCRuntime/Selector.mac.cs \

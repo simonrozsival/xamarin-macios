@@ -2782,16 +2782,20 @@ xamarin_registrar_dlsym (void **function_pointer, const char *assembly, const ch
 	if (*function_pointer != NULL)
 		return;
 
-	GCHandle exception_gchandle = INVALID_GCHANDLE;
-	*function_pointer = xamarin_lookup_unmanaged_function (assembly, symbol, id, &exception_gchandle);
-	if (*function_pointer != NULL)
-		return;
+	// TODO: looking up symbols via xamarin_lookup_unmanaged_function doesn't work with the proposed changes
+	// is it necessary though? won't the symbols be exposed via UnmanagedCallersOnly so dlsym should resolve them?
 
-	if (exception_gchandle != INVALID_GCHANDLE)
-		xamarin_process_managed_exception_gchandle (exception_gchandle);
+	// GCHandle exception_gchandle = INVALID_GCHANDLE;
+	// *function_pointer = xamarin_lookup_unmanaged_function (assembly, symbol, id, &exception_gchandle);
+	// if (*function_pointer != NULL)
+	// 	return;
+
+	// if (exception_gchandle != INVALID_GCHANDLE)
+	// 	xamarin_process_managed_exception_gchandle (exception_gchandle);
 
 	// This shouldn't really happen
-	NSString *msg = [NSString stringWithFormat: @"Unable to load the symbol '%s' to call managed code: %@", symbol, xamarin_print_all_exceptions (exception_gchandle)];
+	// NSString *msg = [NSString stringWithFormat: @"Unable to load the symbol '%s' to call managed code: %@", symbol, xamarin_print_all_exceptions (exception_gchandle)];
+	NSString *msg = [NSString stringWithFormat: @"Unable to load the symbol '%s' to call managed code", symbol];
 	NSLog (@"%@", msg);
 	@throw [[NSException alloc] initWithName: @"SymbolNotFoundException" reason: msg userInfo: NULL];
 }

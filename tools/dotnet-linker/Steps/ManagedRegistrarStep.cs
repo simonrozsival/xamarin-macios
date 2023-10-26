@@ -112,11 +112,6 @@ namespace Xamarin.Linker {
 
 			// Report back any exceptions that occurred during the processing.
 			exceptions = this.exceptions;
-
-			// Mark some stuff we use later on.
-			abr.SetCurrentAssembly (abr.PlatformAssembly);
-			Annotations.Mark (abr.RegistrarHelper_Register.Resolve ());
-			abr.ClearCurrentAssembly ();
 		}
 
 		protected override void TryProcessAssembly (AssemblyDefinition assembly)
@@ -184,8 +179,10 @@ namespace Xamarin.Linker {
 			process |= StaticRegistrar.GetCategoryAttribute (type) is not null;
 
 			var registerAttribute = StaticRegistrar.GetRegisterAttribute (type);
-			if (registerAttribute is not null && registerAttribute.IsWrapper)
+			if (registerAttribute is not null && registerAttribute.IsWrapper) {
+				modified |= AddCreateManagedInstanceMethod (type, registerAttribute);
 				return modified;
+			}
 
 			if (!process)
 				return modified;
@@ -212,7 +209,93 @@ namespace Xamarin.Linker {
 				}
 			}
 
+			AddCreateManagedInstanceMethod (type, registerAttribute);
+
 			return true;
+		}
+
+		bool AddCreateManagedInstanceMethod(TypeDefinition type, RegisterAttribute? registerAttribute)
+		{
+			// TODO skip categories
+			// TODO don't skip protocols -> create protocol wrapper instead
+			if (type.IsAbstract || (registerAttribute is not null && registerAttribute.SkipRegistration)) {
+				return false;
+			}
+
+			// TODO for protocol wrappers I guess we need to get the exported type name of the protocol?
+			var exportedTypeName = DerivedLinkContext.StaticRegistrar.GetExportedTypeName (type, registerAttribute);
+
+			var callbackType = GetCallbackType (type);
+			var genericSuffix = type.HasGenericParameters ? $"_{type.GenericParameters.Count}" : "";
+			var name = $"dotnet_CreateManagedInstance_{exportedTypeName}{genericSuffix}";
+			var callback = callbackType.AddMethod (name, MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig, abr.System_IntPtr);
+			callback.CustomAttributes.Add (CreateUnmanagedCallersAttribute (name));
+			callback.AddParameter ("self", abr.System_IntPtr);
+
+			_ = callback.CreateBody (out var il);
+
+			var ctor = FindConstructorWithOneParameter (type, "ObjCRuntime", "NativeHandle")
+				?? FindConstructorWithOneParameter (type, "System", "IntPtr")
+				?? FindConstructorWithTwoParameters (type, "ObjCRuntime", "NativeHandle", "System", "Boolean")
+				?? FindConstructorWithTwoParameters (type, "System", "IntPtr", "System", "Boolean");
+
+			il.Emit (OpCodes.Ldstr, $"UCO '{name}' -> using ctor '{ctor}' for type '{type}'");
+			il.Emit (OpCodes.Call, abr.Runtime_NSLog);
+
+			if (ctor is not null) {
+				ctor.CustomAttributes.Add (abr.CreateDynamicDependencyAttribute (callback.Name, callbackType));
+
+				il.Emit (OpCodes.Ldarg_0);
+				if (ctor.Parameters [0].ParameterType.Is ("ObjCRuntime", "NativeHandle"))
+					il.Emit (OpCodes.Call, abr.NativeObject_op_Implicit_NativeHandle);
+				if (ctor.Parameters.Count == 2)
+					il.EmitLdc (false); // owns: false // TODO get the value as a parameter
+				il.Emit (OpCodes.Newobj, ctor);
+			} else {
+				var cctor = GetOrCreateStaticConstructor (type);
+				cctor.CustomAttributes.Add (abr.CreateDynamicDependencyAttribute (callback.Name, callbackType));
+
+				// TODO: In the original code we would throw via `MissingCtor`
+				il.Emit (OpCodes.Ldc_I4, 8027);
+				il.Emit (OpCodes.Ldstr, $"The type {type} is missing a constructor that takes a single parameter of type NativeHandle or IntPtr.");
+				il.Emit (OpCodes.Call, abr.Runtime_CreateRuntimeException);
+			}
+
+			il.Emit (OpCodes.Call, abr.Runtime_AllocGCHandle);
+			il.Emit (OpCodes.Ret);
+
+			return true;
+
+			static MethodDefinition? FindConstructorWithOneParameter (TypeDefinition type, string ns, string cls)
+				=> type.Methods.SingleOrDefault (method =>
+					method.IsConstructor
+						&& !method.IsStatic
+						&& method.HasParameters
+						&& method.Parameters.Count == 1
+						&& method.Parameters [0].ParameterType.Is (ns, cls));
+
+			static MethodDefinition? FindConstructorWithTwoParameters (TypeDefinition type, string ns1, string cls1, string ns2, string cls2)
+				=> type.Methods.SingleOrDefault (method =>
+					method.IsConstructor
+						&& !method.IsStatic
+						&& method.HasParameters
+						&& method.Parameters.Count == 2
+						&& method.Parameters [0].ParameterType.Is (ns1, cls2)
+						&& method.Parameters [1].ParameterType.Is (ns2, cls2));
+		}
+
+		MethodDefinition GetOrCreateStaticConstructor (TypeDefinition type)
+		{
+			var staticCtor = type.GetTypeConstructor ();
+			if (staticCtor is null) {
+				staticCtor = type.AddMethod (".cctor", MethodAttributes.Private | MethodAttributes.HideBySig | MethodAttributes.RTSpecialName | MethodAttributes.SpecialName | MethodAttributes.Static, abr!.System_Void);
+				staticCtor.CreateBody (out var il);
+				il.Emit (OpCodes.Ret);
+
+				Annotations.AddPreservedMethod (type, staticCtor);
+			}
+
+			return staticCtor;
 		}
 
 		void ProcessMethod (MethodDefinition method, HashSet<MethodDefinition> methods_to_wrap)
@@ -276,6 +359,18 @@ namespace Xamarin.Linker {
 			}
 		}
 
+		TypeDefinition GetCallbackType (TypeDefinition type)
+		{
+			var callbackType = type.NestedTypes.SingleOrDefault (v => v.Name == "__Registrar_Callbacks__");
+			if (callbackType is null) {
+				callbackType = new TypeDefinition (string.Empty, "__Registrar_Callbacks__", TypeAttributes.NestedPrivate | TypeAttributes.Sealed | TypeAttributes.Class);
+				callbackType.BaseType = abr.System_Object;
+				type.NestedTypes.Add (callbackType);
+			}
+
+			return callbackType;
+		}
+
 		int counter;
 		void CreateUnmanagedCallersMethod (MethodDefinition method, AssemblyTrampolineInfo infos, List<TypeDefinition> proxyInterfaces)
 		{
@@ -283,12 +378,7 @@ namespace Xamarin.Linker {
 			var placeholderType = abr.System_IntPtr;
 			var name = $"callback_{counter++}_{Sanitize (method.DeclaringType.FullName)}_{Sanitize (method.Name)}";
 
-			var callbackType = method.DeclaringType.NestedTypes.SingleOrDefault (v => v.Name == "__Registrar_Callbacks__");
-			if (callbackType is null) {
-				callbackType = new TypeDefinition (string.Empty, "__Registrar_Callbacks__", TypeAttributes.NestedPrivate | TypeAttributes.Sealed | TypeAttributes.Class);
-				callbackType.BaseType = abr.System_Object;
-				method.DeclaringType.NestedTypes.Add (callbackType);
-			}
+			var callbackType = GetCallbackType (method.DeclaringType);
 
 			var callback = callbackType.AddMethod (name, MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig, placeholderType);
 			callback.CustomAttributes.Add (CreateUnmanagedCallersAttribute (name));
@@ -325,12 +415,8 @@ namespace Xamarin.Linker {
 				//     // generated implementation of the proxy interface:
 				//     public void __IRegistrarGenericTypeProxy__CustomNSObject_1____SomeMethod (IntPtr sel, IntPtr p0, IntPtr* exception_gchandle)
 				//     {
-				//         try {
-				//             var obj0 = Runtime.GetNSObject<T> (p0);
-				//             SomeMethod (obj0);
-				//         } catch (Exception ex) {
-				//             *exception_gchandle = Runtime.AllocGCHandle (ex);
-				//         }
+				//         var obj0 = Runtime.GetNSObject<T> (p0);
+				//         SomeMethod (obj0);
 				//     }
 				//
 				//     // generated registrar callbacks:
@@ -339,8 +425,12 @@ namespace Xamarin.Linker {
 				//         [UnmanagedCallersOnly (EntryPoint = "_callback_1_CustomNSObject_1_SomeMethod")]
 				//         public unsafe static void callback_1_CustomNSObject_1_SomeMethod (IntPtr pobj, IntPtr sel, IntPtr p0, IntPtr* exception_gchandle)
 				//         {
-				//             var proxy = (__IRegistrarGenericTypeProxy__CustomNSObject_1__)Runtime.GetNSObject (pobj);
-				//             proxy.__IRegistrarGenericTypeProxy__CustomNSObject_1____SomeMethod (sel, p0, exception_gchandle);
+				//             try {
+				//                 var proxy = (__IRegistrarGenericTypeProxy__CustomNSObject_1__)Runtime.GetNSObject (pobj);
+				//                 proxy.__IRegistrarGenericTypeProxy__CustomNSObject_1____SomeMethod (sel, p0, exception_gchandle);
+				//             } catch (Exception ex) {
+				//                 *exception_gchandle = Runtime.AllocGCHandle (ex);
+				//             }
 				//         }
 				//     }
 				// }
@@ -370,6 +460,7 @@ namespace Xamarin.Linker {
 					interfaceMethod.AddParameter (parameter.Name, parameter.ParameterType);
 				}
 
+				// TODO: we need to move the `try-catch` block to the interface method
 				// we need to wait until we know all the parameters of the interface method before we generate this method
 				EmitCallToProxyMethod (method, callback, interfaceMethod);
 			} else {
@@ -1335,7 +1426,7 @@ namespace Xamarin.Linker {
 			// add a native handle param + a dummy parameter that we know for a fact won't be used anywhere
 			// to make the signature of the new constructor unique
 			var handleParameter = clonedCtor.AddParameter ("nativeHandle", abr.System_IntPtr);
-			var dummyParameter = clonedCtor.AddParameter ("dummy", abr.ObjCRuntime_IManagedRegistrar);
+			var dummyParameter = clonedCtor.AddParameter ("dummy", abr.Foundation_NSObject); // TODO this could be a conflict
 
 			var body = clonedCtor.CreateBody (out var il);
 
