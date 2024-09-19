@@ -3151,9 +3151,9 @@ namespace Registrar {
 
 								var genericSuffix = @class.Type.HasGenericParameters ? $"_{@class.Type.GenericParameters.Count}" : "";
 								interfaces.WriteLine ("-(id) __dotnet_CreateManagedInstance;");
-								sb.WriteLine ("id dotnet_CreateManagedInstance_{0}{1} (id self);", EncodeNonAsciiCharacters (@class.ExportedName), genericSuffix);
+								sb.WriteLine ("id dotnet_CreateManagedInstance_{0}{1} (id self);", Sanitize (@class.ExportedName), genericSuffix);
 								sb.WriteLine ("-(id) __dotnet_CreateManagedInstance {");
-								sb.WriteLine ("return dotnet_CreateManagedInstance_{0}{1} (self);", EncodeNonAsciiCharacters (@class.ExportedName), genericSuffix);
+								sb.WriteLine ("return dotnet_CreateManagedInstance_{0}{1} (self);", Sanitize (@class.ExportedName), genericSuffix);
 								sb.WriteLine ("}");
 							}
 						}
@@ -3313,6 +3313,7 @@ namespace Registrar {
 
 							iface.Write (") ");
 							try {
+								// TODO the delegate type seems to be incorrectly resolved to `id` instead of `void (^)()` -- why??
 								iface.Write (ToObjCParameterType (property.PropertyType, property.DeclaringType.Type.FullName, exceptions, property.Property));
 							} catch (ProductException mte) {
 								exceptions.Add (CreateException (4138, mte, property.Property, "The registrar cannot marshal the property type '{0}' of the property '{1}.{2}'.",
@@ -3346,7 +3347,7 @@ namespace Registrar {
 						try {
 							if (is_protocol)
 								iface.Write (method.IsOptional ? "@optional " : "@required ");
-							iface.WriteLine ("{0};", GetObjCSignature (method, exceptions));
+							iface.WriteLine ("{0};", GetObjCSignature (method, exceptions)); // TODO the signatures of properties with custom delegates seem to be incorrect??
 						} catch (ProductException ex) {
 							skip.Add (method);
 							exceptions.Add (ex);
@@ -3389,9 +3390,9 @@ namespace Registrar {
 								// TODO remove this hack
 
 								var genericSuffix = @class.Type.HasGenericParameters ? $"_{@class.Type.GenericParameters.Count}" : "";							
-								sb.WriteLine ("id dotnet_CreateManagedInstance_{0}{1} (id self);", EncodeNonAsciiCharacters (@class.ExportedName), genericSuffix);
+								sb.WriteLine ("id dotnet_CreateManagedInstance_{0}{1} (id self);", Sanitize (@class.ExportedName), genericSuffix);
 								sb.WriteLine ("-(id) __dotnet_CreateManagedInstance {");
-								sb.WriteLine ("return dotnet_CreateManagedInstance_{0}{1} (self);", EncodeNonAsciiCharacters (@class.ExportedName), genericSuffix);
+								sb.WriteLine ("return dotnet_CreateManagedInstance_{0}{1} (self);", Sanitize (@class.ExportedName), genericSuffix);
 								sb.WriteLine ("}");
 								sb.WriteLine ();
 							}

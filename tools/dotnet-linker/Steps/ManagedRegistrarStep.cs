@@ -227,7 +227,7 @@ namespace Xamarin.Linker {
 
 			var callbackType = GetCallbackType (type);
 			var genericSuffix = type.HasGenericParameters ? $"_{type.GenericParameters.Count}" : "";
-			var name = $"dotnet_CreateManagedInstance_{exportedTypeName}{genericSuffix}";
+			var name = $"dotnet_CreateManagedInstance_{Sanitize (exportedTypeName)}{genericSuffix}";
 			var callback = callbackType.AddMethod (name, MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig, abr.System_IntPtr);
 			callback.CustomAttributes.Add (CreateUnmanagedCallersAttribute (name));
 			callback.AddParameter ("self", abr.System_IntPtr);
