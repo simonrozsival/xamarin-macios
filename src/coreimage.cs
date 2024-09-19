@@ -1533,8 +1533,8 @@ namespace CoreImage {
 	[Obsolete ("Do not use; this type does not exist on this platform.")]
 #endif
 	[iOS (17, 0)]
-	[MacCatalyst (17, 0)]
-#endif
+	// [MacCatalyst (17, 0)]
+	[NoMacCatalyst]
 	[NoWatch]
 	[NoTV]
 	[BaseType (typeof (NSObject))]

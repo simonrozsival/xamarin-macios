@@ -25072,7 +25072,8 @@ namespace UIKit {
 		[NoWatch]
 		[NoTV]
 		[NoiOS]
-		[MacCatalyst (13, 1)]
+		// [MacCatalyst (13, 1)]
+		[NoMacCatalyst]
 		[Export ("titlebar")]
 		[NullAllowed]
 		UITitlebar Titlebar { get; }
@@ -27568,7 +27569,8 @@ namespace UIKit {
 	[NoiOS]
 	[NoTV]
 	[NoWatch]
-	[MacCatalyst (13, 1)]
+	// [MacCatalyst (13, 1)]
+	[NoMacCatalyst]
 	[BaseType (typeof (NSObject))]
 	interface UITitlebar {
 		[Export ("titleVisibility", ArgumentSemantic.Assign)]
