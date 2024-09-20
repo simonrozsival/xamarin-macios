@@ -178,9 +178,13 @@ namespace Xamarin.Linker {
 			process |= IsNSObject (type);
 			process |= StaticRegistrar.GetCategoryAttribute (type) is not null;
 
+			// TODO how to handle native objects that aren't NSObject?
+			process |= type.FullName == "Security.SecCertificate";
+
 			var registerAttribute = StaticRegistrar.GetRegisterAttribute (type);
 			if (registerAttribute is not null && registerAttribute.IsWrapper) {
-				modified |= AddCreateManagedInstanceMethod (type, registerAttribute);
+				modified |= AddINativeObjectCreateManagedInstanceMethod (type);
+				modified |= AddRegistrarCallbacksCreateManagedInstanceMethod (type, registerAttribute);
 				return modified;
 			}
 
@@ -209,16 +213,79 @@ namespace Xamarin.Linker {
 				}
 			}
 
-			AddCreateManagedInstanceMethod (type, registerAttribute);
+			AddINativeObjectCreateManagedInstanceMethod (type);
+			AddRegistrarCallbacksCreateManagedInstanceMethod (type, registerAttribute);
 
 			return true;
 		}
 
-		bool AddCreateManagedInstanceMethod(TypeDefinition type, RegisterAttribute? registerAttribute)
+		bool AddINativeObjectCreateManagedInstanceMethod(TypeDefinition type)
+		{
+			if (type.IsAbstract) {
+				return false;
+			}
+
+			// TODO should we only need this for generic classes and skip it for others to avoid the overhead?
+
+			// TODO do I need to do something special to override the interface method?
+			// type.Interfaces.Add (new InterfaceImplementation (abr.ObjCRuntime_INativeObject));
+
+			var createManagedInstance = type.AddMethod ("CreateManagedInstance", MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.Virtual | MethodAttributes.ReuseSlot | MethodAttributes.HideBySig, abr.ObjCRuntime_INativeObject);
+			createManagedInstance.AddParameter ("self", abr.System_IntPtr);
+			createManagedInstance.AddParameter ("owns", abr.System_Boolean);
+
+			createManagedInstance.Overrides.Add (abr.INativeObject_CreateManagedInstance);
+
+			_ = createManagedInstance.CreateBody (out var il);
+
+			MethodReference? ctor = FindConstructorWithOneParameter (type, "ObjCRuntime", "NativeHandle")
+				?? FindConstructorWithOneParameter (type, "System", "IntPtr")
+				?? FindConstructorWithTwoParameters (type, "ObjCRuntime", "NativeHandle", "System", "Boolean")
+				?? FindConstructorWithTwoParameters (type, "System", "IntPtr", "System", "Boolean");
+
+			if (ctor is not null) {
+				if (ctor.DeclaringType.HasGenericParameters) {
+					ctor = ctor.DeclaringType.CreateMethodReferenceOnGenericType (ctor, ctor.DeclaringType.GenericParameters.ToArray ());
+				}
+
+				il.Emit (OpCodes.Ldarg_0);
+				if (ctor.Parameters [0].ParameterType.Is ("ObjCRuntime", "NativeHandle"))
+					il.Emit (OpCodes.Call, abr.NativeObject_op_Implicit_NativeHandle);
+				if (ctor.Parameters.Count == 2)
+					il.Emit (OpCodes.Ldarg_1);
+				il.Emit (OpCodes.Newobj, ctor);
+			} else {
+				il.Emit (OpCodes.Ldstr, $"'{type}' does not have a ctor that could be used in CreateManagedInstance");
+				il.Emit (OpCodes.Call, abr.Runtime_NSLog);
+
+				il.Emit (OpCodes.Ldnull);
+			}
+
+			il.Emit (OpCodes.Ret);
+
+			return true;
+		}
+
+		bool AddRegistrarCallbacksCreateManagedInstanceMethod(TypeDefinition type, RegisterAttribute? registerAttribute)
 		{
 			// TODO skip categories
 			// TODO don't skip protocols -> create protocol wrapper instead
-			if (type.IsAbstract || (registerAttribute is not null && registerAttribute.SkipRegistration)) {
+
+			if (type.IsAbstract) {
+				return false;	
+			}
+
+			// When there is a RegisterAttribute with SkipRegistration set to true, we don't need to create the CreateManagedInstance method.
+			if (registerAttribute is not null && registerAttribute.SkipRegistration) {
+				return false;
+			}
+
+			var ctor = FindNativeHandleConstructor (type);
+
+			if (ctor is null) {
+				// TODO what if the base class has the right constructor though? should that one be used?
+				// should we create constructors that just proxy the given arguments to the base class?
+
 				return false;
 			}
 
@@ -234,13 +301,8 @@ namespace Xamarin.Linker {
 
 			_ = callback.CreateBody (out var il);
 
-			var ctor = FindConstructorWithOneParameter (type, "ObjCRuntime", "NativeHandle")
-				?? FindConstructorWithOneParameter (type, "System", "IntPtr")
-				?? FindConstructorWithTwoParameters (type, "ObjCRuntime", "NativeHandle", "System", "Boolean")
-				?? FindConstructorWithTwoParameters (type, "System", "IntPtr", "System", "Boolean");
-
-			il.Emit (OpCodes.Ldstr, $"UCO '{name}' -> using ctor '{ctor}' for type '{type}'");
-			il.Emit (OpCodes.Call, abr.Runtime_NSLog);
+			// il.Emit (OpCodes.Ldstr, $"UCO '{name}' -> using ctor '{ctor}' for type '{type}'");
+			// il.Emit (OpCodes.Call, abr.Runtime_NSLog);
 
 			if (ctor is not null) {
 				ctor.CustomAttributes.Add (abr.CreateDynamicDependencyAttribute (callback.Name, callbackType));
@@ -265,24 +327,38 @@ namespace Xamarin.Linker {
 			il.Emit (OpCodes.Ret);
 
 			return true;
-
-			static MethodDefinition? FindConstructorWithOneParameter (TypeDefinition type, string ns, string cls)
-				=> type.Methods.SingleOrDefault (method =>
-					method.IsConstructor
-						&& !method.IsStatic
-						&& method.HasParameters
-						&& method.Parameters.Count == 1
-						&& method.Parameters [0].ParameterType.Is (ns, cls));
-
-			static MethodDefinition? FindConstructorWithTwoParameters (TypeDefinition type, string ns1, string cls1, string ns2, string cls2)
-				=> type.Methods.SingleOrDefault (method =>
-					method.IsConstructor
-						&& !method.IsStatic
-						&& method.HasParameters
-						&& method.Parameters.Count == 2
-						&& method.Parameters [0].ParameterType.Is (ns1, cls2)
-						&& method.Parameters [1].ParameterType.Is (ns2, cls2));
 		}
+
+		internal static MethodDefinition? FindNativeHandleConstructor (TypeDefinition type)
+		{
+			return FindConstructorWithOneParameter (type, "ObjCRuntime", "NativeHandle")
+				?? FindConstructorWithOneParameter (type, "System", "IntPtr")
+				?? FindConstructorWithTwoParameters (type, "ObjCRuntime", "NativeHandle", "System", "Boolean")
+				?? FindConstructorWithTwoParameters (type, "System", "IntPtr", "System", "Boolean");
+		}
+
+		internal static bool ShouldGenerateCreateManagedInstanceMethod (TypeReference type)
+		{
+			return !type.Resolve ().IsAbstract
+				&& FindNativeHandleConstructor (type.Resolve ()) is not null;
+		}
+
+		static MethodDefinition? FindConstructorWithOneParameter (TypeDefinition type, string ns, string cls)
+			=> type.Methods.SingleOrDefault (method =>
+				method.IsConstructor
+					&& !method.IsStatic
+					&& method.HasParameters
+					&& method.Parameters.Count == 1
+					&& method.Parameters [0].ParameterType.Is (ns, cls));
+
+		static MethodDefinition? FindConstructorWithTwoParameters (TypeDefinition type, string ns1, string cls1, string ns2, string cls2)
+			=> type.Methods.SingleOrDefault (method =>
+				method.IsConstructor
+					&& !method.IsStatic
+					&& method.HasParameters
+					&& method.Parameters.Count == 2
+					&& method.Parameters [0].ParameterType.Is (ns1, cls2)
+					&& method.Parameters [1].ParameterType.Is (ns2, cls2));
 
 		MethodDefinition GetOrCreateStaticConstructor (TypeDefinition type)
 		{

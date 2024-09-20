@@ -3145,17 +3145,13 @@ namespace Registrar {
 						sb.WriteLine ($"@implementation {EncodeNonAsciiCharacters (@class.ExportedName)} (__dotnet)");
 						sb.Indent ();
 
-						if (!@class.Type.Resolve ().IsAbstract) {
-							if (@class.ExportedName != "__monomac_internal_ActionDispatcher") {
-								// TODO remove this hack
-
-								var genericSuffix = @class.Type.HasGenericParameters ? $"_{@class.Type.GenericParameters.Count}" : "";
-								interfaces.WriteLine ("-(id) __dotnet_CreateManagedInstance;");
-								sb.WriteLine ("id dotnet_CreateManagedInstance_{0}{1} (id self);", Sanitize (@class.ExportedName), genericSuffix);
-								sb.WriteLine ("-(id) __dotnet_CreateManagedInstance {");
-								sb.WriteLine ("return dotnet_CreateManagedInstance_{0}{1} (self);", Sanitize (@class.ExportedName), genericSuffix);
-								sb.WriteLine ("}");
-							}
+						if (ManagedRegistrarStep.ShouldGenerateCreateManagedInstanceMethod (@class.Type)) {
+							var genericSuffix = @class.Type.HasGenericParameters ? $"_{@class.Type.GenericParameters.Count}" : "";
+							interfaces.WriteLine ("-(id) __dotnet_CreateManagedInstance;");
+							sb.WriteLine ("id dotnet_CreateManagedInstance_{0}{1} (id self);", Sanitize (@class.ExportedName), genericSuffix);
+							sb.WriteLine ("-(id) __dotnet_CreateManagedInstance {");
+							sb.WriteLine ("return dotnet_CreateManagedInstance_{0}{1} (self);", Sanitize (@class.ExportedName), genericSuffix);
+							sb.WriteLine ("}");
 						}
 
 						if (!@class.IsCategory) {
@@ -3328,12 +3324,9 @@ namespace Registrar {
 				}
 
 #if NET
-				if (LinkContext.App.Registrar == RegistrarMode.ManagedStatic && !is_protocol) {
-					if (!@class.Type.Resolve ().IsAbstract) {
-						if (@class.ExportedName != "__monomac_internal_ActionDispatcher") {
-							// TODO remove this hack
-							iface.WriteLine ("-(id) __dotnet_CreateManagedInstance;");
-						}
+				if (LinkContext.App.Registrar == RegistrarMode.ManagedStatic) {
+					if (!is_protocol && ManagedRegistrarStep.ShouldGenerateCreateManagedInstanceMethod (@class.Type)) {
+						iface.WriteLine ("-(id) __dotnet_CreateManagedInstance;");
 					}
 
 					if (!@class.IsCategory) {
@@ -3385,17 +3378,13 @@ namespace Registrar {
 
 #if NET
 					if (LinkContext.App.Registrar == RegistrarMode.ManagedStatic) {
-						if (!@class.Type.Resolve ().IsAbstract) {
-							if (@class.ExportedName != "__monomac_internal_ActionDispatcher") {
-								// TODO remove this hack
-
-								var genericSuffix = @class.Type.HasGenericParameters ? $"_{@class.Type.GenericParameters.Count}" : "";							
-								sb.WriteLine ("id dotnet_CreateManagedInstance_{0}{1} (id self);", Sanitize (@class.ExportedName), genericSuffix);
-								sb.WriteLine ("-(id) __dotnet_CreateManagedInstance {");
-								sb.WriteLine ("return dotnet_CreateManagedInstance_{0}{1} (self);", Sanitize (@class.ExportedName), genericSuffix);
-								sb.WriteLine ("}");
-								sb.WriteLine ();
-							}
+						if (ManagedRegistrarStep.ShouldGenerateCreateManagedInstanceMethod (@class.Type)) {
+							var genericSuffix = @class.Type.HasGenericParameters ? $"_{@class.Type.GenericParameters.Count}" : "";							
+							sb.WriteLine ("id dotnet_CreateManagedInstance_{0}{1} (id self);", Sanitize (@class.ExportedName), genericSuffix);
+							sb.WriteLine ("-(id) __dotnet_CreateManagedInstance {");
+							sb.WriteLine ("return dotnet_CreateManagedInstance_{0}{1} (self);", Sanitize (@class.ExportedName), genericSuffix);
+							sb.WriteLine ("}");
+							sb.WriteLine ();
 						}
 
 						var isUserType = !@class.IsProtocol && !@class.IsCategory && !@class.IsWrapper && !@class.IsModel ? "YES" : "NO";
@@ -5899,7 +5888,7 @@ namespace Registrar {
 			return str;
 		}
 
-		// Find the value of the [UserDelegateType] attribute on the specified delegate
+		// ManagedRegistrarStep.Find the value of the [UserDelegateType] attribute on the specified delegate
 		public TypeReference GetUserDelegateType (MethodReference invokeMethod)
 		{
 			return GetUserDelegateTypeImpl (invokeMethod.Resolve ());

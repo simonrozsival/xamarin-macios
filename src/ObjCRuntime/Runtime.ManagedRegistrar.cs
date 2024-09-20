@@ -1,4 +1,4 @@
-#if NET
+// #if NET
 #nullable enable
 
 using System;
@@ -16,7 +16,8 @@ namespace ObjCRuntime {
 			internal static T? TryCreateManagedInstance<T> (NativeHandle handle)
 				where T : class, INativeObject
 			{
-				return TryCreateManagedInstance (handle, typeof (T)) as T;
+				return TryCreateManagedInstance (handle, typeof (T)) as T
+					?? T.CreateManagedInstance (handle, owns: false) as T;
 			}
 
 			internal static INativeObject? TryCreateManagedInstance (NativeHandle handle, Type type)
@@ -24,7 +25,7 @@ namespace ObjCRuntime {
 				EnsureManagedStaticRegistrar ();
 
 				if (handle == NativeHandle.Zero) {
-					Runtime.NSLog ($"TryCreateManagedInstance ({handle:x}, {type}) => handle is zero");
+					// Runtime.NSLog ($"TryCreateManagedInstance ({handle:x}, {type}) => handle is zero");
 					return null;
 				}
 
@@ -33,7 +34,7 @@ namespace ObjCRuntime {
 					: CreateManagedInstanceViaFallback (handle, type);
 
 				var managedInstance = GetGCHandleTarget (instancePtr);
-				Runtime.NSLog ($"TryCreateManagedInstance ({handle:x}, {type}) => {managedInstance}");
+				// Runtime.NSLog ($"TryCreateManagedInstance ({handle:x}, {type}) => {managedInstance}");
 
 				if (managedInstance is Exception exception) {
 					throw exception;
@@ -51,12 +52,34 @@ namespace ObjCRuntime {
 					return null;
 				}
 
-				INativeObject? obj = TryCreateManagedInstance (handle, typeof (T));
+				// Calling the Objective-C virtual factory method allows us to resolve the _actual_ derived type of the object
+				INativeObject? obj = TryCreateManagedInstance (handle, typeof(T));
 				if (obj is T managedInstance) {
 					return managedInstance;
 				}
 
-				throw Runtime.CreateRuntimeException (8027, $"Failed to marshal Objective-C object {handle:x} to managed type {typeof (T).FullName} - got {obj} ({obj?.GetType().FullName ?? "<null>"}) instead.");
+				// Runtime.NSLog($"Could not create managed instance of {typeof(T)} via objective-c virtual factory method");
+
+				// Fallback to the static factory method -- this is necessary for generic types, but it doesn't allow us to resolve the _actual_ derived type of the object if any
+				INativeObject? obj2 = T.CreateManagedInstance (handle, owns: false);
+				if (obj2 is T managedInstance2) {
+					// TODO releoase `obj`?
+
+					return managedInstance2;
+				}
+
+				// Runtime.NSLog($"Could not create managed instance of {typeof(T)} via .NET static virtual factory method");
+
+				string expectedTypeName = typeof (T)?.FullName ?? "<unknown>";
+				string actualObjectType = obj?.GetType().FullName ?? "<null>";
+				string actualObjectType2 = obj2?.GetType().FullName ?? "<null>";
+
+				// TODO release `obj` and `obj2`?
+
+				// TODO throw or return null?
+				// throw Runtime.CreateRuntimeException (8027, $"Failed to marshal Objective-C object {handle:x} to managed type {expectedTypeName} - got {actualObjectType} instead and INativeObject.CreateManagedInstance did not return a valid instance but {actualObjectType2} instead.");
+				Runtime.NSLog ($"Failed to marshal Objective-C object {handle:x} to managed type {expectedTypeName} - got {actualObjectType} instead and INativeObject.CreateManagedInstance did not return a valid instance but {actualObjectType2} instead.");
+				return null;
 			}
 
 			internal static unsafe NativeHandle GetNativeClass (Type type, out bool isCustomType)
@@ -115,8 +138,6 @@ namespace ObjCRuntime {
 			{
 				// Fallback in case of C-structs and protocol wrappers
 				// TODO pass the `owns` parameter? right now we always assume it's `false`
-				Runtime.NSLog ($"TryCreateManagedInstance ({handle:x}, {type}) => fallback");
-
 				// TODO we don't generate the Objective-C code this is supposed to call
 
 				var selectorName = ConstructCreateManagedInstanceSelector (type);
@@ -185,4 +206,4 @@ namespace ObjCRuntime {
 	}
 }
 
-#endif
+// #endif

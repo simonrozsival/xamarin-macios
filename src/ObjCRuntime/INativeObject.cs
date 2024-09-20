@@ -16,6 +16,10 @@ namespace ObjCRuntime {
 			get;
 		}
 #endif
+		static virtual INativeObject? CreateManagedInstance (NativeHandle handle, bool owns)
+		{
+			return null;
+		}
 	}
 
 #if !COREBUILD

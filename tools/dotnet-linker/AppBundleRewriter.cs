@@ -745,6 +745,18 @@ namespace Xamarin.Linker {
 			}
 		}
 
+		public MethodReference INativeObject_CreateManagedInstance {
+			get {
+				return GetMethodReference (PlatformAssembly, ObjCRuntime_INativeObject, "CreateManagedInstance", (v) =>
+						v.IsStatic
+						&& v.HasParameters
+						&& v.Parameters.Count == 2
+						&& v.Parameters [0].ParameterType.Is ("ObjCRuntime", "NativeHandle")
+						&& v.Parameters [1].ParameterType.Is ("System", "Boolean")
+						&& !v.HasGenericParameters);
+			}
+		}
+
 		public MethodReference Runtime_NSLog {
 			get {
 				return GetMethodReference (PlatformAssembly,
