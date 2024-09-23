@@ -1735,7 +1735,7 @@ namespace ObjCRuntime {
 
 #if NET
 			if (IsManagedStaticRegistrar) {
-				return ManagedRegistrar.CreateManagedInstance<NSObject> (ptr);
+				return ManagedRegistrar.CreateManagedInstance<NSObject> (ptr, owns: false);
 			}
 #endif
 
@@ -1765,7 +1765,7 @@ namespace ObjCRuntime {
 
 #if NET
 			if (IsManagedStaticRegistrar) {
-				return ManagedRegistrar.CreateManagedInstance<T> (ptr);
+				return ManagedRegistrar.CreateManagedInstance<T> (ptr, owns: false);
 			}
 #endif
 
@@ -1854,7 +1854,7 @@ namespace ObjCRuntime {
 
 #if NET
 			if (IsManagedStaticRegistrar) {
-				return ManagedRegistrar.CreateManagedInstance<NSObject> (ptr);
+				return ManagedRegistrar.CreateManagedInstance<NSObject> (ptr, owns: false);
 			}
 #endif
 
@@ -1963,7 +1963,7 @@ namespace ObjCRuntime {
 #if NET
 			if (IsManagedStaticRegistrar) {
 				// TODO pass `owns`
-				var instance = ManagedRegistrar.TryCreateManagedInstance (ptr, target_type);
+				var instance = ManagedRegistrar.TryCreateManagedInstance (ptr, target_type, owns);
 				if (instance is null) {
 					// TODO MissingCtor (...)
 					throw new InvalidOperationException ($"TODO: MissingCtor ({ptr}, {target_type}, {implementation}, {owns})");
@@ -2031,12 +2031,13 @@ namespace ObjCRuntime {
 
 #if NET
 			if (IsManagedStaticRegistrar) {
-				// TODO pass `owns`
-				var instance = ManagedRegistrar.TryCreateManagedInstance<T> (ptr);
-				if (instance is null) {
-					// TODO call MissingCtor (...)
-					throw new InvalidOperationException ($"TODO: MissingCtor ({ptr}, {typeof (T)}, {owns})");
+				var instance = ManagedRegistrar.TryCreateManagedInstance<T> (ptr, owns)
+					?? throw new InvalidOperationException ($"TODO: MissingCtor ({ptr}, {typeof (T)}, {owns})"); // // TODO call MissingCtor (...) ??
+
+				if (owns) {
+					TryReleaseINativeObject (instance);
 				}
+
 				return instance;
 			}
 #endif
@@ -2052,15 +2053,13 @@ namespace ObjCRuntime {
 					throw ErrorHelper.CreateError (8004, $"Cannot create an instance of {implementation.FullName} for the native object 0x{ptr:x} (of type '{Class.class_getName (Class.GetClassForObject (ptr))}'), because another instance already exists for this native object (of type {o.GetType ().FullName}).");
 				}
 #if NET
-				if (!Runtime.IsManagedStaticRegistrar) {
-					// For other registrars other than managed-static the generic parameter of ConstructNSObject is used
-					// only to cast the return value so we can safely pass NSObject here to satisfy the constraints of the
-					// generic parameter.
-					var rv = (T?)(INativeObject?) ConstructNSObject<NSObject> (ptr, implementation, MissingCtorResolution.ThrowConstructor1NotFound, sel, method_handle);
-					if (owns)
-						TryReleaseINativeObject (rv);
-					return rv;
-				}
+				// For other registrars other than managed-static the generic parameter of ConstructNSObject is used
+				// only to cast the return value so we can safely pass NSObject here to satisfy the constraints of the
+				// generic parameter.
+				var rv = (T?)(INativeObject?) ConstructNSObject<NSObject> (ptr, implementation, MissingCtorResolution.ThrowConstructor1NotFound, sel, method_handle);
+				if (owns)
+					TryReleaseINativeObject (rv);
+				return rv;
 #else
 				var rv = ConstructNSObject<T> (ptr, implementation, MissingCtorResolution.ThrowConstructor1NotFound, sel, method_handle);
 				if (owns)

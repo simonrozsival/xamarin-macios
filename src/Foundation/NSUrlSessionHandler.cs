@@ -124,6 +124,7 @@ namespace Foundation {
 		};
 
 		NSUrlSession session;
+		NSUrlSessionHandlerDelegate? handlerDelegate;
 		readonly Dictionary<NSUrlSessionTask, InflightData> inflightRequests;
 		readonly object inflightRequestsLock = new object ();
 		readonly NSUrlSessionConfiguration.SessionConfigurationType sessionType;
@@ -174,7 +175,8 @@ namespace Foundation {
 			else if ((sp & (SecurityProtocolType) 12288) != 0) // Tls13 value not yet in monno
 				configuration.TLSMinimumSupportedProtocol = SslProtocol.Tls_1_3;
 
-			session = NSUrlSession.FromConfiguration (configuration, (INSUrlSessionDelegate) new NSUrlSessionHandlerDelegate (this), null);
+			handlerDelegate = new NSUrlSessionHandlerDelegate (this);
+			session = NSUrlSession.FromConfiguration (configuration, (INSUrlSessionDelegate) handlerDelegate, null);
 			inflightRequests = new Dictionary<NSUrlSessionTask, InflightData> ();
 		}
 
@@ -400,7 +402,8 @@ namespace Foundation {
 					// remove storage so that it is not used in any of the requests
 					configuration.HttpCookieStorage = null;
 				}
-				session = NSUrlSession.FromConfiguration (configuration, (INSUrlSessionDelegate) new NSUrlSessionHandlerDelegate (this), null);
+				handlerDelegate = new NSUrlSessionHandlerDelegate (this);
+				session = NSUrlSession.FromConfiguration (configuration, (INSUrlSessionDelegate) handlerDelegate, null);
 				oldSession.Dispose ();
 			}
 		}

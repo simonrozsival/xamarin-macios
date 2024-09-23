@@ -3110,6 +3110,7 @@ namespace Registrar {
 							sb.WriteLine($"// generating code for wrapper class {EncodeNonAsciiCharacters (@class.ExportedName)} (introduced in {introducedIn}, current sdk is {sdk})");
 						}
 
+						// Do these need skipping because they have the `[DisableDefaultConstructor]` attribute?
 						if (@class.ExportedName == "MPSCNNConvolutionStateNode"
 							|| @class.ExportedName == "GKHybridStrategist") {
 							sb.WriteLine($"// skipping generating code for {@class.ExportedName} -- TODO fix this");
@@ -3147,15 +3148,15 @@ namespace Registrar {
 
 						if (ManagedRegistrarStep.ShouldGenerateCreateManagedInstanceMethod (@class.Type)) {
 							var genericSuffix = @class.Type.HasGenericParameters ? $"_{@class.Type.GenericParameters.Count}" : "";
-							interfaces.WriteLine ("-(id) __dotnet_CreateManagedInstance;");
-							sb.WriteLine ("id dotnet_CreateManagedInstance_{0}{1} (id self);", Sanitize (@class.ExportedName), genericSuffix);
-							sb.WriteLine ("-(id) __dotnet_CreateManagedInstance {");
-							sb.WriteLine ("return dotnet_CreateManagedInstance_{0}{1} (self);", Sanitize (@class.ExportedName), genericSuffix);
+							interfaces.WriteLine ("-(id) __dotnet_CreateManagedInstance:(BOOL)owns;");
+							sb.WriteLine ("id dotnet_CreateManagedInstance_{0}{1} (id self, BOOL owns);", Sanitize (@class.ExportedName), genericSuffix);
+							sb.WriteLine ("-(id) __dotnet_CreateManagedInstance:(BOOL)owns {");
+							sb.WriteLine ("return dotnet_CreateManagedInstance_{0}{1} (self, owns);", Sanitize (@class.ExportedName), genericSuffix);
 							sb.WriteLine ("}");
 						}
 
 						if (!@class.IsCategory) {
-							interfaces.WriteLine ("-(id) __dotnet_IsUserType;");
+							interfaces.WriteLine ("+(BOOL) __dotnet_IsUserType;");
 							sb.WriteLine ("+(BOOL) __dotnet_IsUserType {");
 							sb.WriteLine ($"return NO;");
 							sb.WriteLine ("}");
@@ -3380,9 +3381,9 @@ namespace Registrar {
 					if (LinkContext.App.Registrar == RegistrarMode.ManagedStatic) {
 						if (ManagedRegistrarStep.ShouldGenerateCreateManagedInstanceMethod (@class.Type)) {
 							var genericSuffix = @class.Type.HasGenericParameters ? $"_{@class.Type.GenericParameters.Count}" : "";							
-							sb.WriteLine ("id dotnet_CreateManagedInstance_{0}{1} (id self);", Sanitize (@class.ExportedName), genericSuffix);
-							sb.WriteLine ("-(id) __dotnet_CreateManagedInstance {");
-							sb.WriteLine ("return dotnet_CreateManagedInstance_{0}{1} (self);", Sanitize (@class.ExportedName), genericSuffix);
+							sb.WriteLine ("id dotnet_CreateManagedInstance_{0}{1} (id self, BOOL owns);", Sanitize (@class.ExportedName), genericSuffix);
+							sb.WriteLine ("-(id) __dotnet_CreateManagedInstance:(BOOL)owns {");
+							sb.WriteLine ("return dotnet_CreateManagedInstance_{0}{1} (self, owns);", Sanitize (@class.ExportedName), genericSuffix);
 							sb.WriteLine ("}");
 							sb.WriteLine ();
 						}

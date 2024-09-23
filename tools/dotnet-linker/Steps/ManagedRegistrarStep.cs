@@ -172,14 +172,16 @@ namespace Xamarin.Linker {
 					modified |= ProcessType (nested, infos, proxyInterfaces);
 			}
 
+			if (StaticRegistrar.IsNativeObject (DerivedLinkContext, type) && !IsNSObject (type))
+			{
+				return AddINativeObjectCreateManagedInstanceMethod (type);
+			}
+
 			// Figure out if there are any types we need to process
 			var process = false;
 
 			process |= IsNSObject (type);
 			process |= StaticRegistrar.GetCategoryAttribute (type) is not null;
-
-			// TODO how to handle native objects that aren't NSObject?
-			process |= type.FullName == "Security.SecCertificate";
 
 			var registerAttribute = StaticRegistrar.GetRegisterAttribute (type);
 			if (registerAttribute is not null && registerAttribute.IsWrapper) {
@@ -221,19 +223,24 @@ namespace Xamarin.Linker {
 
 		bool AddINativeObjectCreateManagedInstanceMethod(TypeDefinition type)
 		{
-			if (type.IsAbstract) {
+			if (type.IsAbstract && !type.IsInterface) {
 				return false;
 			}
 
-			// TODO should we only need this for generic classes and skip it for others to avoid the overhead?
+			if (IsNSObject (type) && !type.HasGenericParameters) {
+				return false;
+			}
 
-			// TODO do I need to do something special to override the interface method?
-			// type.Interfaces.Add (new InterfaceImplementation (abr.ObjCRuntime_INativeObject));
 
 			var createManagedInstance = type.AddMethod ("CreateManagedInstance", MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.Virtual | MethodAttributes.ReuseSlot | MethodAttributes.HideBySig, abr.ObjCRuntime_INativeObject);
 			createManagedInstance.AddParameter ("self", abr.System_IntPtr);
 			createManagedInstance.AddParameter ("owns", abr.System_Boolean);
 
+			var cctor = GetOrCreateStaticConstructor (type);
+			cctor.CustomAttributes.Add (abr.CreateDynamicDependencyAttribute ("CreateManagedInstance", type));
+
+			// This needs to be added explicitly to all types even though the base type is already INativeObject
+			type.Interfaces.Add (new InterfaceImplementation (abr.ObjCRuntime_INativeObject)); // TODO try to remove this line
 			createManagedInstance.Overrides.Add (abr.INativeObject_CreateManagedInstance);
 
 			_ = createManagedInstance.CreateBody (out var il);
@@ -269,7 +276,6 @@ namespace Xamarin.Linker {
 		bool AddRegistrarCallbacksCreateManagedInstanceMethod(TypeDefinition type, RegisterAttribute? registerAttribute)
 		{
 			// TODO skip categories
-			// TODO don't skip protocols -> create protocol wrapper instead
 
 			if (type.IsAbstract) {
 				return false;	
@@ -339,8 +345,10 @@ namespace Xamarin.Linker {
 
 		internal static bool ShouldGenerateCreateManagedInstanceMethod (TypeReference type)
 		{
-			return !type.Resolve ().IsAbstract
-				&& FindNativeHandleConstructor (type.Resolve ()) is not null;
+			var typeDefinition = type.Resolve ();
+			return !typeDefinition.IsAbstract
+				&& !typeDefinition.HasGenericParameters
+				&& FindNativeHandleConstructor (typeDefinition) is not null; // TODO should we _only_ generate this code for NSObject subclasses and not for NativeObjects which can use the other virtual static interface method?
 		}
 
 		static MethodDefinition? FindConstructorWithOneParameter (TypeDefinition type, string ns, string cls)
@@ -357,7 +365,7 @@ namespace Xamarin.Linker {
 					&& !method.IsStatic
 					&& method.HasParameters
 					&& method.Parameters.Count == 2
-					&& method.Parameters [0].ParameterType.Is (ns1, cls2)
+					&& method.Parameters [0].ParameterType.Is (ns1, cls1)
 					&& method.Parameters [1].ParameterType.Is (ns2, cls2));
 
 		MethodDefinition GetOrCreateStaticConstructor (TypeDefinition type)
