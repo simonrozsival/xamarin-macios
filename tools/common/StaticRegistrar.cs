@@ -3124,44 +3124,51 @@ namespace Registrar {
 #if NET
 					// TODO do not duplicate this code...
 					if (LinkContext.App.Registrar == RegistrarMode.ManagedStatic && !@class.IsProtocol && !@class.IsCategory) {
+						var nativeClassName = EncodeNonAsciiCharacters (@class.ExportedName);
+
 						// TODO fix this without this workaround
 						var introducedIn = GetSdkIntroducedVersion (@class.Type, out _);
 						Version sdk = GetSDKVersion ();
 						if (sdk < introducedIn) {
 							// TODO add an exception?
-							sb.WriteLine($"// skipping generating code for wrapper class {EncodeNonAsciiCharacters (@class.ExportedName)} (introduced in {introducedIn}, current sdk is {sdk})");
+							sb.WriteLine($"// skipping generating code for wrapper class {nativeClassName} (introduced in {introducedIn}, current sdk is {sdk})");
 							continue;
 						} else {
-							sb.WriteLine($"// generating code for wrapper class {EncodeNonAsciiCharacters (@class.ExportedName)} (introduced in {introducedIn}, current sdk is {sdk})");
+							sb.WriteLine($"// generating code for wrapper class {nativeClassName} (introduced in {introducedIn}, current sdk is {sdk})");
 						}
 
 						CheckNamespace (@class, exceptions);
 
+						if (!isPlatformType) {
+							// TODO should we #include or #import custom native libraries headers? -- THIS NEEDS FIXING
+							continue;
+						}
+
 						// var selector = Runtime.ConstructGetNativeClassSelector("");
 						var selector = $"__dotnet_GetNativeClass_{Sanitize (@class.Type.Module.Assembly.Name.Name)}__{Sanitize (@class.Type.FullName)}:";
 
-						interfaces.WriteLine ($"@interface __dotnet ({EncodeNonAsciiCharacters (@class.ExportedName)})");
+						interfaces.WriteLine ($"@interface __dotnet ({nativeClassName})");
 						interfaces.Indent ();
 						interfaces.WriteLine ($"+(id) {selector} (BOOL*) isCustomType;");
 						interfaces.Unindent ();
 						interfaces.WriteLine ($"@end");
 						interfaces.WriteLine ();
 
-						sb.WriteLine ($"@implementation __dotnet ({EncodeNonAsciiCharacters (@class.ExportedName)})");
+						sb.WriteLine ($"@implementation __dotnet ({nativeClassName})");
 						sb.Indent ();
 						sb.WriteLine ($"+(id) {selector} (BOOL*) isCustomType {{");
 						var isCustomType = !@class.IsProtocol && !@class.IsCategory && !isPlatformType ? "YES" : "NO";
 						sb.WriteLine ($"*isCustomType = {isCustomType};");
-						sb.WriteLine ($"return [{EncodeNonAsciiCharacters (@class.ExportedName)} class];");
+						sb.WriteLine ($"return [{nativeClassName} class];");
 						sb.WriteLine ($"}}");
 						sb.Unindent ();
 						sb.WriteLine ($"@end");
 						sb.WriteLine ();
 
-						interfaces.WriteLine ($"@interface {EncodeNonAsciiCharacters (@class.ExportedName)} (__dotnet)");
+						interfaces.WriteLine ($"@interface {nativeClassName} (__dotnet)");
 						interfaces.Indent ();
 
-						sb.WriteLine ($"@implementation {EncodeNonAsciiCharacters (@class.ExportedName)} (__dotnet)");
+						sb.WriteLine ($"@implementation {nativeClassName} (__dotnet)");
 						sb.Indent ();
 
 						if (ManagedRegistrarStep.ShouldGenerateCreateManagedInstanceMethod (@class.Type)) {
@@ -5842,6 +5849,8 @@ namespace Registrar {
 			header.WriteLine ("#include <objc/objc.h>");
 			header.WriteLine ("#include <objc/runtime.h>");
 			header.WriteLine ("#include <objc/message.h>");
+
+			// TODO so if we generate code for non-platform native libraries, we should reference their header files from here?
 
 			methods.WriteLine ($"#include \"{Path.GetFileName (header_path)}\"");
 			methods.StringBuilder.AppendLine ("extern \"C\" {");
