@@ -2032,7 +2032,7 @@ namespace ObjCRuntime {
 #if NET
 			if (IsManagedStaticRegistrar) {
 				var instance = ManagedRegistrar.TryCreateManagedInstance<T> (ptr, owns)
-					?? throw new InvalidOperationException ($"TODO: MissingCtor ({ptr}, {typeof (T)}, {owns})"); // // TODO call MissingCtor (...) ??
+					?? throw new InvalidOperationException ($"TODO: MissingCtor ({ptr:x}, {typeof (T)}, {owns})"); // // TODO call MissingCtor (...) ??
 
 				if (owns) {
 					TryReleaseINativeObject (instance);

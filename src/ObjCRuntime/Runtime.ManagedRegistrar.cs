@@ -10,7 +10,7 @@ namespace ObjCRuntime {
 		internal static class ManagedRegistrar {
 			private static Lazy<NativeHandle> s_dotnet = new (() => Class.GetHandle ("__dotnet"));
 			private static Lazy<NativeHandle> s_respondsToSelector = new (() => Selector.GetHandle ("respondsToSelector:"));
-			private static Lazy<NativeHandle> s_createManagedInstance = new (() => Selector.GetHandle ("__dotnet_CreateManagedInstance"));
+			private static Lazy<NativeHandle> s_createManagedInstance = new (() => Selector.GetHandle ("__dotnet_CreateManagedInstance:"));
 			private static Lazy<NativeHandle> s_isUserType = new (() => Selector.GetHandle ("__dotnet_IsUserType"));
 
 			internal static INativeObject? TryCreateManagedInstance (NativeHandle handle, Type type, bool owns)
@@ -26,7 +26,7 @@ namespace ObjCRuntime {
 				}
 
 				// TODO if we only generated this method for NSObjects and not for C-structs, we could drop the `owns` parameter
-				IntPtr instancePtr = IntPtr_objc_msgSend_bool (handle, s_createManagedInstance.Value, owns); // TODO pass `owns` ??
+				IntPtr instancePtr = IntPtr_objc_msgSend_bool (handle, s_createManagedInstance.Value, owns);
 
 				object? managedInstance = GetGCHandleTarget (instancePtr);
 				if (managedInstance is Exception exception) {
@@ -45,22 +45,41 @@ namespace ObjCRuntime {
 					return null;
 				}
 
-				bool useVirtualDispatch = typeof (Foundation.NSObject).IsAssignableFrom (typeof (T)) && !typeof (T).IsGenericType && !typeof (T).IsInterface;
-				INativeObject? obj = useVirtualDispatch
-					? TryCreateManagedInstance (handle, typeof(T), owns) // Calling the Objective-C virtual factory method allows us to resolve the _actual_ derived type of the object
-					: T.CreateManagedInstance (handle, owns); // Fallback to the static factory method -- this is necessary for C-structs, generic types, and protocols. For generic types, which are NSObjects, it doesn't allow us to resolve the _actual_ derived type of the object but we're stuck at that very specific level of abstraction anyway.
+				INativeObject? obj = null;
 
-				if (obj is T managedInstance) {
-					return managedInstance;
+				bool skipVirtualDispatch = !typeof (Foundation.NSObject).IsAssignableFrom (typeof (T)) || typeof (T).IsGenericType || typeof (T).IsInterface;
+				if (!skipVirtualDispatch) {
+					// Calling the Objective-C virtual factory method allows us to resolve the _actual_ derived type of the object
+					obj = TryCreateManagedInstance (handle, typeof(T), owns);
+
+					if (obj is T managedInstance) {
+						return managedInstance;
+					}
+
+					string expectedTypeName = typeof (T)?.FullName ?? "<unknown>";
+					string actualObjectType = obj?.GetType().FullName ?? "<null>";
+					Runtime.NSLog ($"Could not create managed instance of {typeof(T)} via objective-c virtual dispatch. Got {actualObjectType} instead of {expectedTypeName}.");
+
+					if (owns) {
+						Runtime.TryReleaseINativeObject (obj);
+					}
 				}
 
-				// TODO log?
-				// string expectedTypeName = typeof (T)?.FullName ?? "<unknown>";
-				// string actualObjectType = obj?.GetType().FullName ?? "<null>";
-				// Runtime.NSLog ($"Could not create managed instance of {typeof(T)} via objective-c virtual factory method. Got {actualObjectType} instead of {expectedTypeName}.");
+				{
+					// Fallback to the static factory method -- this is necessary for C-structs, generic types, and protocols. For generic types, which are NSObjects, it doesn't allow us to resolve the _actual_ derived type of the object but we're stuck at that very specific level of abstraction anyway.
+					obj = T.CreateManagedInstance (handle, owns);
 
-				if (owns) {
-					Runtime.TryReleaseINativeObject (obj);
+					if (obj is T managedInstance) {
+						return managedInstance;
+					}
+
+					string expectedTypeName = typeof (T)?.FullName ?? "<unknown>";
+					string actualObjectType = obj?.GetType().FullName ?? "<null>";
+					Runtime.NSLog ($"Could not create managed instance of {typeof(T)} via objective-c virtual factory method. Got {actualObjectType} instead of {expectedTypeName}.");
+
+					if (owns) {
+						Runtime.TryReleaseINativeObject (obj);
+					}
 				}
 
 				return null;

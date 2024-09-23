@@ -227,10 +227,14 @@ namespace Xamarin.Linker {
 				return false;
 			}
 
-			if (IsNSObject (type) && !type.HasGenericParameters) {
+			// So I had an idea that we might be able to drop the static interface method for regular NSObjects
+			// but it didn't work. There are some edge cases (LocalDataTask instead of Foundation.NSUrlSessionDataTask ???) that don't allow this optimization.
+
+			TypeDefinition? targetType = type.IsInterface ? GetProtocolWrapperType (type) : type;
+			if (targetType is null) {
+				Console.WriteLine ($"Could not find the target type for '{type}'");
 				return false;
 			}
-
 
 			var createManagedInstance = type.AddMethod ("CreateManagedInstance", MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.Virtual | MethodAttributes.ReuseSlot | MethodAttributes.HideBySig, abr.ObjCRuntime_INativeObject);
 			createManagedInstance.AddParameter ("self", abr.System_IntPtr);
@@ -240,15 +244,15 @@ namespace Xamarin.Linker {
 			cctor.CustomAttributes.Add (abr.CreateDynamicDependencyAttribute ("CreateManagedInstance", type));
 
 			// This needs to be added explicitly to all types even though the base type is already INativeObject
-			type.Interfaces.Add (new InterfaceImplementation (abr.ObjCRuntime_INativeObject)); // TODO try to remove this line
+			// type.Interfaces.Add (new InterfaceImplementation (abr.ObjCRuntime_INativeObject)); // TODO try to remove this line
 			createManagedInstance.Overrides.Add (abr.INativeObject_CreateManagedInstance);
 
 			_ = createManagedInstance.CreateBody (out var il);
 
-			MethodReference? ctor = FindConstructorWithOneParameter (type, "ObjCRuntime", "NativeHandle")
-				?? FindConstructorWithOneParameter (type, "System", "IntPtr")
-				?? FindConstructorWithTwoParameters (type, "ObjCRuntime", "NativeHandle", "System", "Boolean")
-				?? FindConstructorWithTwoParameters (type, "System", "IntPtr", "System", "Boolean");
+			MethodReference? ctor = FindConstructorWithOneParameter (targetType, "ObjCRuntime", "NativeHandle")
+				?? FindConstructorWithOneParameter (targetType, "System", "IntPtr")
+				?? FindConstructorWithTwoParameters (targetType, "ObjCRuntime", "NativeHandle", "System", "Boolean")
+				?? FindConstructorWithTwoParameters (targetType, "System", "IntPtr", "System", "Boolean");
 
 			if (ctor is not null) {
 				if (ctor.DeclaringType.HasGenericParameters) {
@@ -271,6 +275,17 @@ namespace Xamarin.Linker {
 			il.Emit (OpCodes.Ret);
 
 			return true;
+		}
+
+		private static TypeDefinition? GetProtocolWrapperType (TypeDefinition type)
+		{
+			foreach (var attribute in type.CustomAttributes) {
+				if (attribute.AttributeType.Is ("Foundation", "ProtocolAttribute")) {
+					return StaticRegistrar.GetProtocolAttributeWrapperType (attribute)?.Resolve ();
+				}
+			}
+
+			return null;
 		}
 
 		bool AddRegistrarCallbacksCreateManagedInstanceMethod(TypeDefinition type, RegisterAttribute? registerAttribute)
