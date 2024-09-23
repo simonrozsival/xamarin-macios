@@ -3012,6 +3012,31 @@ namespace Registrar {
 				sb.AppendLine ("@implementation __dotnet");
 				sb.AppendLine ("@end");
 				sb.AppendLine ();
+
+				foreach (var skipped in skipped_types) {
+					var type = skipped.Skipped.Resolve ();
+					var encodedManagedClassName = Sanitize (EncodeNonAsciiCharacters (type.FullName));
+					var nativeClassName = GetExportedTypeName (type, GetRegisterAttribute (type));
+					var selector = $"__dotnet_GetNativeClass_{Sanitize (type.Module.Assembly.Name.Name)}__{Sanitize (type.FullName)}:";
+
+					interfaces.WriteLine ($"@interface __dotnet ({encodedManagedClassName})");
+					interfaces.Indent ();
+					interfaces.WriteLine ($"+(id) {selector} (BOOL*) isCustomType;");
+					interfaces.Unindent ();
+					interfaces.WriteLine ($"@end");
+					interfaces.WriteLine ();
+
+					sb.WriteLine ($"@implementation __dotnet ({encodedManagedClassName})");
+					sb.Indent ();
+					sb.WriteLine ($"+(id) {selector} (BOOL*) isCustomType {{");
+					var isCustomType = !IsPlatformType (type) ? "YES" : "NO"; // TODO is this correct in all cases?
+					sb.WriteLine ($"*isCustomType = {isCustomType};");
+					sb.WriteLine ($"return [{nativeClassName} class];");
+					sb.WriteLine ($"}}");
+					sb.Unindent ();
+					sb.WriteLine ($"@end");
+					sb.WriteLine ();
+				}
 			}
 #endif
 
@@ -3094,8 +3119,8 @@ namespace Registrar {
 				// DO NOT GENERATE THE MAP FOR MANAGED STATIC REGISTRAR
 				}
 #endif
-				
-				if (@class.IsWrapper && isPlatformType) {
+
+				if (@class.IsWrapper) {
 #if NET
 					// TODO do not duplicate this code...
 					if (LinkContext.App.Registrar == RegistrarMode.ManagedStatic && !@class.IsProtocol && !@class.IsCategory) {
@@ -3108,13 +3133,6 @@ namespace Registrar {
 							continue;
 						} else {
 							sb.WriteLine($"// generating code for wrapper class {EncodeNonAsciiCharacters (@class.ExportedName)} (introduced in {introducedIn}, current sdk is {sdk})");
-						}
-
-						// Do these need skipping because they have the `[DisableDefaultConstructor]` attribute?
-						if (@class.ExportedName == "MPSCNNConvolutionStateNode"
-							|| @class.ExportedName == "GKHybridStrategist") {
-							sb.WriteLine($"// skipping generating code for {@class.ExportedName} -- TODO fix this");
-							continue;
 						}
 
 						CheckNamespace (@class, exceptions);
@@ -3158,7 +3176,8 @@ namespace Registrar {
 						if (!@class.IsCategory) {
 							interfaces.WriteLine ("+(BOOL) __dotnet_IsUserType;");
 							sb.WriteLine ("+(BOOL) __dotnet_IsUserType {");
-							sb.WriteLine ($"return NO;");
+							var isUserType = isPlatformType ? "NO" : "YES";
+							sb.WriteLine ($"return {isUserType};");
 							sb.WriteLine ("}");
 						}
 
@@ -3327,7 +3346,7 @@ namespace Registrar {
 #if NET
 				if (LinkContext.App.Registrar == RegistrarMode.ManagedStatic) {
 					if (!is_protocol && ManagedRegistrarStep.ShouldGenerateCreateManagedInstanceMethod (@class.Type)) {
-						iface.WriteLine ("-(id) __dotnet_CreateManagedInstance;");
+						iface.WriteLine ("-(id) __dotnet_CreateManagedInstance:(BOOL)owns;");
 					}
 
 					if (!@class.IsCategory) {
@@ -3380,7 +3399,7 @@ namespace Registrar {
 #if NET
 					if (LinkContext.App.Registrar == RegistrarMode.ManagedStatic) {
 						if (ManagedRegistrarStep.ShouldGenerateCreateManagedInstanceMethod (@class.Type)) {
-							var genericSuffix = @class.Type.HasGenericParameters ? $"_{@class.Type.GenericParameters.Count}" : "";							
+							var genericSuffix = @class.Type.HasGenericParameters ? $"_{@class.Type.GenericParameters.Count}" : "";
 							sb.WriteLine ("id dotnet_CreateManagedInstance_{0}{1} (id self, BOOL owns);", Sanitize (@class.ExportedName), genericSuffix);
 							sb.WriteLine ("-(id) __dotnet_CreateManagedInstance:(BOOL)owns {");
 							sb.WriteLine ("return dotnet_CreateManagedInstance_{0}{1} (self, owns);", Sanitize (@class.ExportedName), genericSuffix);
@@ -3416,7 +3435,7 @@ namespace Registrar {
 						sb.AppendLine ("#pragma clang diagnostic pop");
 
 #if NET
-					if (LinkContext.App.Registrar == RegistrarMode.ManagedStatic && !@class.IsProtocol && !@class.IsCategory) {
+					if (LinkContext.App.Registrar == RegistrarMode.ManagedStatic && !@class.IsCategory) {
 						// var selector = Runtime.ConstructGetNativeClassSelector("");
 						var mangledName = $"{Sanitize (@class.Type.Module.Assembly.Name.Name)}__{Sanitize (@class.Type.FullName)}";
 						var getNativeClassSelector = $"__dotnet_GetNativeClass_{mangledName}:";
@@ -3431,7 +3450,7 @@ namespace Registrar {
 						sb.WriteLine ($"@implementation __dotnet ({EncodeNonAsciiCharacters (@class.ExportedName)})");
 						sb.Indent ();
 						sb.WriteLine ($"+(id) {getNativeClassSelector} (BOOL*) isCustomType {{");
-						var isCustomType = !@class.IsProtocol && !@class.IsCategory && !isPlatformType ? "YES" : "NO";
+						var isCustomType = !isPlatformType ? "YES" : "NO";
 						sb.WriteLine ($"*isCustomType = {isCustomType};");
 						sb.WriteLine ($"return [{EncodeNonAsciiCharacters (@class.ExportedName)} class];");
 						sb.WriteLine ($"}}");

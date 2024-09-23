@@ -2034,9 +2034,10 @@ namespace ObjCRuntime {
 				var instance = ManagedRegistrar.TryCreateManagedInstance<T> (ptr, owns)
 					?? throw new InvalidOperationException ($"TODO: MissingCtor ({ptr:x}, {typeof (T)}, {owns})"); // // TODO call MissingCtor (...) ??
 
-				if (owns) {
-					TryReleaseINativeObject (instance);
-				}
+				// what's the right thing to do here? I don't really understand why we're releasing the instance before returning it. does it apply to the new registrar?
+				// if (owns) {
+				// 	TryReleaseINativeObject (instance);
+				// }
 
 				return instance;
 			}

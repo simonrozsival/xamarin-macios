@@ -10,6 +10,10 @@ using UIKit;
 using MonoTouch.NUnit.UI;
 using NUnit.Framework.Internal;
 using MonoTouchFixtures.BackgroundTasks;
+using ObjCRuntime;
+#if !NET
+using NativeHandle = System.IntPtr;
+#endif
 
 public partial class AppDelegate : UIApplicationDelegate {
 	// class-level declarations
@@ -28,6 +32,11 @@ public partial class AppDelegate : UIApplicationDelegate {
 		return true;
 	}
 #endif
+
+	// TODO why wasn't this constructor found by the managed registrar step?
+	public AppDelegate(NativeHandle ptr) : base(ptr)
+	{
+	}
 
 	partial void PostFinishedLaunching ()
 	{
