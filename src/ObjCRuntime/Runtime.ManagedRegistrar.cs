@@ -33,6 +33,18 @@ namespace ObjCRuntime {
 					throw exception;
 				}
 
+				// TODO: there was an idea to use the `type` parameter to implement the fallback via an ObjC class method on __dotnet:
+				// var selector = Selector.GetHandle($"__dotnet_CreateManagedInstance_{Sanitize (type.FullName)}");
+				// var instancePtr = IntPtr_objc_msgSend_IntPtr (s_dotnet.Handle, selector, handle);
+				//
+				// @implementation __dotnet
+				//    +(id) __dotnet_CreateManagedInstance_CoreGraphics_CGColor:(id)ptr {
+				//         ...
+				//    }
+				//
+				// ... in the end I used the `INativeObject.CreateNativeObject` virtual static interface method because it allows
+				//     support for generic types but maybe we need both fallbacks for C-structs for certain scenarios? do we?
+
 				return managedInstance as INativeObject;
 			}
 

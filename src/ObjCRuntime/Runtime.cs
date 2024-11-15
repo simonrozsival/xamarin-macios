@@ -1962,7 +1962,7 @@ namespace ObjCRuntime {
 
 #if NET
 			if (IsManagedStaticRegistrar) {
-				// TODO pass `owns`
+				// TODO will this work for C-structs and unknown protocols? I'm not sure actually...
 				var instance = ManagedRegistrar.TryCreateManagedInstance (ptr, target_type, owns);
 				if (instance is null) {
 					// TODO MissingCtor (...)

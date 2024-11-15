@@ -574,7 +574,7 @@ namespace Xamarin.Linker {
 			// We don't know the generic parameters of the type we're working with but we know it is a NSObject and it
 			// implements the proxy interface. The generic parameters will be resolved in the proxy method through the v-table.
 			il.Emit (OpCodes.Ldarg_0);
-			il.Emit (OpCodes.Call, abr.Runtime_GetNSObject__System_IntPtr);
+			il.Emit (OpCodes.Call, abr.Runtime_GetNSObject__System_IntPtr); // I think we should call `TryGetNSObject` instead
 			il.Emit (OpCodes.Castclass, proxyInterfaceMethod.DeclaringType);
 
 			if (callback.HasParameters) {

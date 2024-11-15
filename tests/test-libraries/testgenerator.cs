@@ -1650,24 +1650,24 @@ namespace MonoTouchFixtures.ObjCRuntime {
 
 	static void Main ()
 	{
-		while (Path.GetFileName (Environment.CurrentDirectory) != "test-libraries")
-			Environment.CurrentDirectory = Path.GetDirectoryName (Environment.CurrentDirectory)!;
+		// while (Path.GetFileName (Environment.CurrentDirectory) != "test-libraries")
+		// 	Environment.CurrentDirectory = Path.GetDirectoryName (Environment.CurrentDirectory)!;
 
-		/* native code */
-		WriteLibTestStructH ();
-		WriteLibTestDecompileM ();
-		WriteLibTestPropertiesH ();
-		WriteLibTestMethodsH ();
-		WriteLibTestMethodsM ();
+		// /* native code */
+		// WriteLibTestStructH ();
+		// WriteLibTestDecompileM ();
+		// WriteLibTestPropertiesH ();
+		// WriteLibTestMethodsH ();
+		// WriteLibTestMethodsM ();
 
-		/* binding code */
-		WriteApiDefinition ();
-		WriteStructsAndEnums ();
+		// /* binding code */
+		// WriteApiDefinition ();
+		// WriteStructsAndEnums ();
 
-		/* tests */
-		WriteRegistrarTests ();
-		WriteTrampolineTests ();
+		// /* tests */
+		// WriteRegistrarTests ();
+		// WriteTrampolineTests ();
 
-		Console.WriteLine ("Generated test files");
+		// Console.WriteLine ("Generated test files");
 	}
 }
